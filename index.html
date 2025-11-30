@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Jurnal GI Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Bootstrap 5 CSS -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+
+  <!-- Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <!-- Flatpickr (time picker 24h) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body data-theme="light">
+  <div class="container py-4 py-md-5">
+    <div class="row justify-content-center">
+      <div class="col-12 col-lg-11 col-xxl-9">
+        <div class="card border-0">
+          <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 px-md-4 pt-3 pt-md-4 pb-2">
+            <div>
+              <div class="d-flex align-items-center gap-2">
+                <h1 class="h4 mb-0">Jurnal GI Generator</h1>
+                <span class="badge badge-soft">v2 Modern</span>
+              </div>
+              <small class="text-muted">
+                Buat format JURNAL GI siap kirim (WA / teks) dengan sekali klik.
+              </small>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <a href="history.html" class="btn btn-sm btn-outline-secondary">
+                Template & Riwayat
+              </a>
+              <button type="button" id="themeToggle" class="btn btn-sm btn-outline-secondary btn-toggle-theme">
+                <span id="themeIcon">🌙</span>
+                <span id="themeLabel" class="d-none d-sm-inline">Dark mode</span>
+              </button>
+              <button type="button" id="clearAllBtn" class="btn btn-sm btn-outline-danger">
+                Clear All
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body px-3 px-md-4 pb-3 pb-md-4">
+            <form id="jurnalForm" class="row g-3">
+              <!-- SECTION 1: GI, Tanggal, Keterangan -->
+              <div class="col-12">
+                <div class="section-block" id="identitasSection">
+                  <div class="section-header">
+                    <span class="section-title">Identitas Jurnal</span>
+                  </div>
+                  <div class="section-divider"></div>
+
+                  <!-- Baris 1: Nama GI, Tanggal, Hari -->
+                  <div class="row g-3 align-items-end">
+                    <div class="col-12 col-lg-4">
+                      <label class="form-label" for="namaGi">Nama GI</label>
+                      <select id="namaGi" class="form-select">
+                        <option value="">Pilih GI...</option>
+                        <option value="PAMEKASAN">Pamekasan</option>
+                        <option value="GILITIMUR">Gilitimur</option>
+                        <option value="BANGKALAN">Bangkalan</option>
+                        <option value="SAMPANG">Sampang</option>
+                        <option value="GULUK-GULUK">Guluk-Guluk</option>
+                        <option value="SUMENEP">Sumenep</option>
+                      </select>
+                      <div class="form-text">
+                        Pilih GI sesuai lokasi manuver.
+                      </div>
+                    </div>
+
+                    <div class="col-12 col-lg-4">
+                      <label class="form-label" for="tanggal">Tanggal</label>
+                      <input type="date" id="tanggal" class="form-control" />
+                      <div class="form-text">
+                        Hari akan terisi otomatis.
+                      </div>
+                    </div>
+
+                    <div class="col-12 col-lg-4">
+                      <label class="form-label" for="hari">Hari (otomatis)</label>
+                      <input type="text" id="hari" class="form-control" readonly placeholder="—" />
+                      <!-- form-text dummy supaya tinggi kolom sama -->
+                      <div class="form-text d-none d-lg-block">
+                        &nbsp; <!-- atau: Terisi setelah tanggal dipilih. -->
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Baris 2: Uraian pekerjaan full width -->
+                  <div class="row g-3 mt-2">
+                    <div class="col-12">
+                      <label class="form-label" for="keterangan">Uraian Pekerjaan</label>
+                      <textarea
+                        id="keterangan"
+                        rows="2"
+                        class="form-control"
+                        placeholder="Contoh: Pemeliharaan Sampang Bus B Bay Sampang oleh PDKB"
+                      ></textarea>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECTION 2: Pembebasan & Penormalan -->
+              <div class="col-12">
+                <div class="section-block">
+                  <div class="section-header">
+                    <span class="section-title">Pembebasan & Penormalan Tegangan</span>
+                    <span class="chip d-none d-md-inline-flex">
+                      <span class="chip-dot"></span>
+                      Waktu, Peralatan, Bay, Status
+                    </span>
+                  </div>
+                  <div class="section-divider"></div>
+
+                  <!-- Pembebasan Tegangan -->
+                  <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <label class="form-label mb-0">Pembebasan Tegangan</label>
+                      <button type="button" id="addPembebasanRow" class="btn btn-sm btn-outline-accent">
+                        + Tambah Baris
+                      </button>
+                    </div>
+                    <div class="table-responsive">
+                      <table class="table table-sm align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th style="width: 90px;">Waktu</th>
+                            <th>Peralatan</th>
+                            <th>Nama Bay</th>
+                            <th style="width: 120px;">Status</th>
+                            <th style="width: 40px;"></th>
+                          </tr>
+                        </thead>
+                        <tbody id="pembebasanBody">
+                          <!-- baris dinamis -->
+                        </tbody>
+                      </table>
+                    </div>
+                    <div class="form-text mt-1">
+                      Status: <code>#</code> (masuk / in service), <code>//</code> (lepas), <code>Draw In</code>, <code>Draw Out</code>.
+                    </div>
+                  </div>
+
+                  <!-- Penormalan Tegangan -->
+                  <div class="mt-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <label class="form-label mb-0">Penormalan Tegangan</label>
+                      <button type="button" id="addPenormalanRow" class="btn btn-sm btn-outline-accent">
+                        + Tambah Baris
+                      </button>
+                    </div>
+                    <div class="table-responsive">
+                      <table class="table table-sm align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th style="width: 90px;">Waktu</th>
+                            <th>Peralatan</th>
+                            <th>Nama Bay</th>
+                            <th style="width: 120px;">Status</th>
+                            <th style="width: 40px;"></th>
+                          </tr>
+                        </thead>
+                        <tbody id="penormalanBody">
+                          <!-- baris dinamis -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECTION 3: Pengawas & Personel -->
+              <div class="col-12">
+                <div class="section-block">
+                  <div class="section-header">
+                    <span class="section-title">Pengawas & Personel</span>
+                  </div>
+                  <div class="section-divider"></div>
+
+                  <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="dispatcher">Dispatcher</label>
+                      <input type="text" id="dispatcher" class="form-control" placeholder="Contoh: Dede - Tulus" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="pengawasManuver">Pengawas Manuver</label>
+                      <input type="text" id="pengawasManuver" class="form-control" placeholder="Contoh: Dwi Septian - Jafar" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label" for="pengawasPekerjaan">Pengawas Pekerjaan</label>
+                      <input type="text" id="pengawasPekerjaan" class="form-control" placeholder="Contoh: Dayat" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label" for="pengawasK3">Pengawas K3</label>
+                      <input type="text" id="pengawasK3" class="form-control" placeholder="Contoh: Sirrul" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label" for="pelaksanaManuver">Pelaksana Manuver</label>
+                      <input type="text" id="pelaksanaManuver" class="form-control" placeholder="Contoh: Rio - Dimas" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECTION 4: Pesan Penutup -->
+              <div class="col-12">
+                <div class="section-block">
+                  <div class="section-header">
+                    <span class="section-title">Pesan Penutup</span>
+                  </div>
+                  <div class="section-divider"></div>
+
+                  <label class="form-label" for="pesanPenutup">Pesan Penutup</label>
+                  <textarea id="pesanPenutup" rows="2" class="form-control" placeholder="Contoh: Alhamdulillah pekerjaan sudah selesai dengan aman dan lancar 🙏"></textarea>
+                  <div class="form-text">
+                    Bisa diisi doa/penutup seperti: "Alhamdulillah pekerjaan sudah selesai dengan aman dan lancar 🙏"
+                  </div>
+                </div>
+              </div>
+
+              <!-- Actions -->
+             <div class="col-12 d-flex flex-wrap gap-2 justify-content-between align-items-center mt-3">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                  <button type="button" id="generateBtn" class="btn btn-accent">
+                    Generate Jurnal
+                  </button>
+                  <button type="button" id="copyBtn" class="btn btn-outline-accent">
+                    Copy ke Clipboard
+                  </button>
+
+                  <div class="form-check ms-1">
+                    <input class="form-check-input" type="checkbox" id="saveToHistory" checked>
+                    <label class="form-check-label small" for="saveToHistory">
+                      Simpan ke riwayat
+                    </label>
+                  </div>
+                </div>
+
+                <small class="text-muted">
+                  Jurnal juga akan tergenerate otomatis tiap kali form diubah.
+                </small>
+              </div>
+
+              <!-- Preview -->
+              <div class="col-12 mt-3">
+                <label class="form-label mb-1">Preview / Hasil</label>
+                <div id="previewBox" class="preview-box">
+Klik atau ubah form untuk melihat hasil di sini.
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div class="card-footer border-0 pt-0 px-3 px-md-4 pb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <small class="text-muted">
+                
+              </small>
+              <a href="https://idjafarshodik.github.io/Jurnal-Gi-Generator-v1/" target="_blank" rel="noopener" class="link-muted">
+                updated version of Jurnal GI Generator v1
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Small floating chip for theme hint -->
+    <div class="floating-chip chip d-none d-sm-inline-flex">
+      <span class="chip-dot"></span>
+      <span id="themeHint">Mode terang aktif</span>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Flatpickr JS -->
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <!-- Custom JS -->
+  <script src="app.js"></script>
+</body>
+</html>
