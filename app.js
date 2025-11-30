@@ -673,15 +673,15 @@ function createRow(section, data) {
 
         const pesan = presetMap[key];
 
-        if (!textarea.value.trim()) {
-          textarea.value = pesan;
-        } else if (!textarea.value.includes(pesan)) {
-          textarea.value = textarea.value.trimEnd() + "\n" + pesan;
-        }
+        // selalu GANTI isi textarea dengan preset terpilih
+        textarea.value = pesan;
 
+        // reset dropdown ke posisi default
         presetSelect.value = "";
+
         updateAndSave();
       });
+
     }
 
   addPembebasanRowBtn.addEventListener("click", () => {

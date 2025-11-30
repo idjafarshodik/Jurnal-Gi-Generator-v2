@@ -132,7 +132,7 @@
               type="button"
               class="btn btn-sm btn-accent btn-template-switching btn-use-switching"
               data-switch-index="${idx}">
-              Gunakan Switching
+              Gunakan Template
             </button>
           </div>
         `;

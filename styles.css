@@ -432,6 +432,31 @@ body[data-theme="dark"] .flatpickr-time .numInputWrapper span {
     line-height: 1;
   }
 
-  
+ /* SweetAlert theme follow app */
+.swal2-popup {
+  background: var(--card-bg) !important;
+  color: var(--text-color) !important;
+  border-radius: 1.2rem !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.swal2-title,
+.swal2-html-container {
+  color: var(--text-color) !important;
+}
+
+.swal2-confirm {
+  background: var(--accent-color) !important;
+  color: #fff !important;
+  border-radius: 999px !important;
+}
+
+.swal2-cancel {
+  border-radius: 999px !important;
+}
+
+
 }
 
