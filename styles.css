@@ -370,5 +370,41 @@ body[data-theme="dark"] .flatpickr-time .numInputWrapper span {
 
   #identitasSection .col-lg-4 {
     margin-bottom: 0.35rem;
+   }
+  
+  /* Spacing tabel pembebasan & penormalan */
+  .section-block .table tbody td {
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
   }
+
+  @media (max-width: 768px) {
+    #pembebasanBody td,
+    #penormalanBody td {
+      padding-inline: 0.25rem;
+    }
+
+    .table-sm input,
+    .table-sm select {
+      min-width: 80px;
+    }
+  }
+
+  
+  /* Template switching card – biar enak di mobile */
+  .template-switching-card {
+    border-radius: 0.9rem;
+  }
+
+  .btn-template-switching {
+    min-width: 150px;
+  }
+
+  @media (max-width: 576px) {
+    .btn-template-switching {
+      width: 100%;
+    }
 }
+
+}
+

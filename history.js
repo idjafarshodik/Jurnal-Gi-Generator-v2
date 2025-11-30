@@ -118,24 +118,24 @@
 
     switchingTemplates.forEach((tpl, idx) => {
       const item = document.createElement("div");
-      item.className = "list-group-item mb-2 rounded-3";
+        item.className = "list-group-item mb-2 rounded-3 template-switching-card";
 
-      item.innerHTML = `
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="fw-semibold">${tpl.name}</div>
-            <div class="small text-muted">
-              ${tpl.pembebasan.length} pembebasan • ${tpl.penormalan.length} penormalan
+        item.innerHTML = `
+          <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
+            <div class="me-sm-3">
+              <div class="fw-semibold">${tpl.name}</div>
+              <div class="small text-muted">
+                ${tpl.pembebasan.length} pembebasan • ${tpl.penormalan.length} penormalan
+              </div>
             </div>
+            <button
+              type="button"
+              class="btn btn-sm btn-accent btn-template-switching btn-use-switching"
+              data-switch-index="${idx}">
+              Gunakan Switching
+            </button>
           </div>
-          <button
-            type="button"
-            class="btn btn-sm btn-accent btn-use-switching"
-            data-switch-index="${idx}">
-            Gunakan Switching
-          </button>
-        </div>
-      `;
+        `;
 
       switchingList.appendChild(item);
     });
@@ -188,28 +188,34 @@
         const snippet = (h.text || "").split("\n").slice(0, 5).join("\n");
 
         item.innerHTML = `
-          <div class="d-flex justify-content-between align-items-center mb-1">
-            <div>
-              <span class="badge badge-soft me-1">${giLabel}</span>
-              <span class="small text-muted">${tglLabel}</span>
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <div>
+                <span class="badge badge-soft me-1">${giLabel}</span>
+                <span class="small text-muted">${tglLabel}</span>
+              </div>
+              <div class="d-flex gap-1">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-accent btn-view-history"
+                  data-id="${h.id}">
+                  Lihat
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-secondary btn-use-history"
+                  data-id="${h.id}">
+                  Gunakan
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-danger btn-delete-history"
+                  data-id="${h.id}">
+                  Hapus
+                </button>
+              </div>
             </div>
-            <div class="d-flex gap-1">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-secondary btn-use-history"
-                data-id="${h.id}">
-                Gunakan
-              </button>
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-danger btn-delete-history"
-                data-id="${h.id}">
-                Hapus
-              </button>
-            </div>
-          </div>
-          <pre class="small mb-0" style="max-height: 8rem; overflow:auto; white-space: pre-wrap;">${snippet}</pre>
-        `;
+            <pre class="small mb-0" style="max-height: 8rem; overflow:auto; white-space: pre-wrap;">${snippet}</pre>
+          `;
 
         historyList.appendChild(item);
       });
@@ -241,6 +247,31 @@
       }, 600);
       return;
     }
+
+        // Klik LIHAT dari RIWAYAT
+    if (target.classList.contains("btn-view-history")) {
+      const id = Number(target.dataset.id);
+      const all = loadHistory();
+      const entry = all.find((h) => h.id === id);
+      if (!entry) return;
+
+      // escape sederhana biar aman di HTML
+      const escapeHtml = (str) =>
+        (str || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+
+      Swal.fire({
+        title: (entry.gi || "Detail Jurnal") + (entry.tanggal ? ` - ${formatTanggalIndo(entry.tanggal)}` : ""),
+        html: `<pre style="text-align:left; white-space:pre-wrap; max-height:60vh; overflow:auto;">${escapeHtml(entry.text)}</pre>`,
+        width: "90%",
+        confirmButtonText: "Tutup"
+      });
+
+      return;
+    }
+
 
     // Klik gunakan dari RIWAYAT
     if (target.classList.contains("btn-use-history")) {

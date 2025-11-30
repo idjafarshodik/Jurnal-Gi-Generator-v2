@@ -544,6 +544,38 @@
   document.getElementById("pelaksanaManuver").addEventListener("input", updateAndSave);
   document.getElementById("pesanPenutup").addEventListener("input", updateAndSave);
 
+    // preset pesan penutup
+  const presetSelect = document.getElementById("presetPesanPenutup");
+    if (presetSelect) {
+      const presetMap = {
+        awal1: "Semoga pekerjaan diberikan keamanan dan kelancaran🙏",
+        awal2: "Bismillah, Semoga pekerjaan lancar dan personil aman🙏🏻🙏🏻",
+        awal3: "Bismillah semoga pekerjaan berjalan lancar personil aman 🤲",
+        akhir1: "Alhamdulillah pekerjaan sudah selesai dengan dan lancar🙏",
+        akhir2: "Alhamdulillah pekerjaan sudah selesai dengan aman dan lancar🙏",
+        akhir3: "Alhamdulillah pekerjaan telah selesai dengan lancar, aman personil dan peralatan, terimakasih 🙏🏻",
+      };
+
+      presetSelect.addEventListener("change", () => {
+        const key = presetSelect.value;
+        if (!key || !presetMap[key]) return;
+
+        const textarea = document.getElementById("pesanPenutup");
+        if (!textarea) return;
+
+        const pesan = presetMap[key];
+
+        if (!textarea.value.trim()) {
+          textarea.value = pesan;
+        } else if (!textarea.value.includes(pesan)) {
+          textarea.value = textarea.value.trimEnd() + "\n" + pesan;
+        }
+
+        presetSelect.value = "";
+        updateAndSave();
+      });
+    }
+
   addPembebasanRowBtn.addEventListener("click", () => {
     createRow("pembebasan");
     updateAndSave();

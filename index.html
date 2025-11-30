@@ -156,7 +156,7 @@
                       </table>
                     </div>
                     <div class="form-text mt-1">
-                      Status: <code>#</code> (masuk / in service), <code>//</code> (lepas), <code>Draw In</code>, <code>Draw Out</code>.
+                      Status: <code>//</code> (masuk), <code>#</code> (lepas), <code>Draw In</code>, <code>Draw Out</code>.
                     </div>
                   </div>
 
@@ -230,12 +230,32 @@
                   <div class="section-divider"></div>
 
                   <label class="form-label" for="pesanPenutup">Pesan Penutup</label>
-                  <textarea id="pesanPenutup" rows="2" class="form-control" placeholder="Contoh: Alhamdulillah pekerjaan sudah selesai dengan aman dan lancar 🙏"></textarea>
+
+                  <!-- NEW: preset pesan penutup -->
+                  <select id="presetPesanPenutup" class="form-select form-select-sm mb-2">
+                    <option value="">Pilih preset pesan (opsional)</option>
+                    <option value="" disabled>──────── Pesan Awal ────────</option>
+                    <option value="awal1">Semoga pekerjaan diberikan keamanan dan kelancaran🙏</option>
+                    <option value="awal2">Bismillah, Semoga pekerjaan lancar dan personil aman🙏🏻🙏🏻</option>
+                    <option value="awal3">Bismillah semoga pekerjaan berjalan lancar personil aman 🤲</option>
+                    <option value="" disabled>──────── Pesan Akhir ────────</option>
+                    <option value="akhir1">Alhamdulillah pekerjaan sudah selesai dengan dan lancar🙏</option>
+                    <option value="akhir2">Alhamdulillah pekerjaan sudah selesai dengan aman dan lancar🙏</option>
+                    <option value="akhir3">Alhamdulillah pekerjaan telah selesai dengan lancar, aman personil dan peralatan, terimakasih 🙏🏻</option>
+                  </select>
+
+                  <textarea
+                    id="pesanPenutup"
+                    rows="2"
+                    class="form-control"
+                    placeholder="Contoh: Alhamdulillah pekerjaan sudah selesai dengan aman dan lancar 🙏"
+                  ></textarea>
                   <div class="form-text">
-                    Bisa diisi doa/penutup seperti: "Alhamdulillah pekerjaan sudah selesai dengan aman dan lancar 🙏"
+                    Bisa diisi doa/penutup, atau gunakan preset di atas.
                   </div>
                 </div>
               </div>
+
 
               <!-- Actions -->
              <div class="col-12 d-flex flex-wrap gap-2 justify-content-between align-items-center mt-3">
