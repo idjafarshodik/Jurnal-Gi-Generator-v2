@@ -79,27 +79,74 @@
       time_24hr: true,
       enableSeconds: false,
       dateFormat: "H:i",
-      allowInput: true
+      allowInput: true,
+      minuteIncrement: 1,
+      onClose(selectedDates, dateStr) {
+        // rapikan format saat picker ditutup
+        const normalized = normalizeSavedTime(dateStr || inputEl.value);
+        inputEl.value = normalized;
+        updateAndSave();
+      }
     });
   }
 
-  function normalizeSavedTime(val) {
-    if (!val) return "";
-    const match = String(val).match(/(\d{1,2}):(\d{2})/);
-    if (!match) return "";
-    const hh = match[1].padStart(2, "0");
-    const mm = match[2];
-    return hh + ":" + mm;
+  function formatTime(raw) {
+    return normalizeSavedTime(raw || "") || "__:__";
   }
 
-  function formatTime(val) {
-    if (!val) return "__:__";
-    const match = String(val).match(/(\d{1,2}):(\d{2})/);
-    if (!match) return "__:__";
-    const hh = match[1].padStart(2, "0");
-    const mm = match[2];
-    return hh + ":" + mm;
+
+  function normalizeSavedTime(val) {
+  if (!val) return "";
+
+  const raw = String(val).trim();
+  if (!raw) return "";
+
+  let s = raw.toLowerCase().replace(/,/g, ".").trim();
+
+  // ---- format dengan AM/PM (contoh: "4:05 pm", "4 pm") ----
+  const ampmMatch = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
+  if (ampmMatch) {
+    let hh = parseInt(ampmMatch[1], 10);
+    let mm = parseInt(ampmMatch[2] || "0", 10);
+    const ampm = ampmMatch[3].toLowerCase();
+
+    if (ampm === "am" && hh === 12) hh = 0;
+    if (ampm === "pm" && hh < 12) hh += 12;
+
+    hh = Math.max(0, Math.min(23, isNaN(hh) ? 0 : hh));
+    mm = Math.max(0, Math.min(59, isNaN(mm) ? 0 : mm));
+
+    return String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
   }
+
+  // ---- format biasa: "16:36", "16.36", "16 36" ----
+  let match = s.match(/(\d{1,2})[^\d]?(\d{2})/);
+  if (!match) {
+    // fallback: ambil digit saja, misal "1636"
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length === 3) {
+      match = [, digits.slice(0, 1), digits.slice(1)];
+    } else if (digits.length === 4) {
+      match = [, digits.slice(0, 2), digits.slice(2)];
+    }
+  }
+
+  if (match) {
+    let hh = parseInt(match[1], 10);
+    let mm = parseInt(match[2], 10);
+
+    if (isNaN(hh) || isNaN(mm)) return raw;
+
+    hh = Math.max(0, Math.min(23, hh));
+    mm = Math.max(0, Math.min(59, mm));
+
+    return String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
+  }
+
+  // kalau gagal parse, jangan dihapus – pakai mentahnya saja
+  return raw;
+}
+
 
   // ======================= RIWAYAT (storage) ==================
   function loadHistory() {
@@ -122,17 +169,29 @@
   function getRowsData(section) {
     const tbody = section === "pembebasan" ? pembebasanBody : penormalanBody;
     const rows = [];
+
     tbody.querySelectorAll("tr").forEach((tr) => {
-      const waktu = tr.querySelector(".waktuInput")?.value || "";
+      const waktuEl = tr.querySelector(".waktuInput");
       const peralatan = tr.querySelector(".peralatanInput")?.value || "";
       const bay = tr.querySelector(".bayInput")?.value || "";
       const status = tr.querySelector(".statusInput")?.value || "";
+
+      const rawWaktu = (waktuEl?.value || "").trim();
+      const waktu = normalizeSavedTime(rawWaktu);
+
+      // sekaligus update value di form kalau beda
+      if (waktuEl && waktu && waktu !== rawWaktu) {
+        waktuEl.value = waktu;
+      }
+
       if (waktu || peralatan || bay) {
         rows.push({ waktu, peralatan, bay, status });
       }
     });
+
     return rows;
   }
+
 
   function saveJournalToHistory(finalText) {
     if (!finalText || !finalText.trim()) return;
@@ -200,7 +259,7 @@
   }
 
   // ======================= ROW DINAMIS ==================
-  function createRow(section, data) {
+function createRow(section, data) {
   const tbody = section === "pembebasan" ? pembebasanBody : penormalanBody;
   const tr = document.createElement("tr");
 
@@ -208,17 +267,19 @@
     <td>
       <input type="text" class="form-control form-control-sm waktuInput" placeholder="00:00" />
     </td>
-    <td>
-      <select class="form-select form-select-sm peralatanInput">
-        <option value="">Pilih Peralatan...</option>
-        <option value="PMT 150KV">PMT 150KV</option>
-        <option value="PMS BUS A 150KV">PMS BUS A 150KV</option>
-        <option value="PMS BUS B 150KV">PMS BUS B 150KV</option>
-        <option value="PMS LINE 150KV">PMS LINE 150KV</option>
-        <option value="PMS GROUND 150KV">PMS GROUND 150KV</option>
-        <option value="PMT INC 20KV">PMT INC 20KV</option>
-        <option value="LAINNYA">Lainnya...</option>
-      </select>
+    <td class="peralatan-cell">
+      <div class="input-group input-group-sm peralatan-group">
+        <select class="form-select form-select-sm peralatanInput peralatanSelect">
+          <option value="">Pilih Peralatan...</option>
+          <option value="PMT 150KV">PMT 150KV</option>
+          <option value="PMS BUS A 150KV">PMS BUS A 150KV</option>
+          <option value="PMS BUS B 150KV">PMS BUS B 150KV</option>
+          <option value="PMS LINE 150KV">PMS LINE 150KV</option>
+          <option value="PMS GROUND 150KV">PMS GROUND 150KV</option>
+          <option value="PMT INC 20KV">PMT INC 20KV</option>
+          <option value="LAINNYA">Lainnya...</option>
+        </select>
+      </div>
     </td>
     <td>
       <input type="text" class="form-control form-control-sm bayInput" placeholder="Contoh: SAMPANG 2" />
@@ -239,68 +300,115 @@
   tbody.appendChild(tr);
 
   const waktuInput = tr.querySelector(".waktuInput");
-  let peralatanInput = tr.querySelector(".peralatanInput");
   const bayInput = tr.querySelector(".bayInput");
   const statusInput = tr.querySelector(".statusInput");
 
+  // peralatan (bisa select / input custom)
+  const peralatanGroup = tr.querySelector(".peralatan-group");
+  const peralatanSelect = tr.querySelector(".peralatanSelect");
+  let peralatanInput = tr.querySelector(".peralatanInput"); // current (bisa select / input)
+
   initTimePicker(waktuInput);
 
-  if (data) {
-  if (data.waktu) waktuInput.value = normalizeSavedTime(data.waktu);
-
-  if (data.peralatan) {
-    let peralatanVal = data.peralatan;
-
-    // backward compatibility: data lama
-    if (peralatanVal === "PMT 20KV") {
-      peralatanVal = "PMT INC 20KV";
-    }
-
-    peralatanInput.value = peralatanVal;
-  }
-
-  if (data.bay)    bayInput.value = data.bay;
-  if (data.status) statusInput.value = data.status;
-  }
-
-
-  // input lain tetap sama
-  [waktuInput, bayInput, statusInput].forEach((el) => {
+  function attachCommonListeners(el) {
     el.addEventListener("input", updateAndSave);
     el.addEventListener("change", updateAndSave);
-  });
+  }
 
-  // ===== logika "LAINNYA" → ganti dropdown jadi textbox =====
-  peralatanInput.addEventListener("change", (e) => {
-    // kalau pilih Lainnya, ubah <select> jadi <input type="text">
+  attachCommonListeners(waktuInput);
+  attachCommonListeners(bayInput);
+  attachCommonListeners(statusInput);
+
+  // --- mode dropdown normal ---
+  function useSelectMode(value) {
+    peralatanGroup.innerHTML = "";
+    peralatanGroup.appendChild(peralatanSelect);
+
+    peralatanSelect.value = value || "";
+    peralatanInput = peralatanSelect;
+
+    attachCommonListeners(peralatanInput);
+  }
+
+  // --- mode input custom + tombol X ---
+  function useCustomMode(initialValue) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "input-group input-group-sm";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "form-control form-control-sm peralatanInput";
+    input.placeholder = "Isi peralatan...";
+    input.value = initialValue || "";
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-sm btn-outline-secondary peralatan-cancel-btn";
+    btn.innerHTML = "&times;";
+
+    wrapper.appendChild(input);
+    wrapper.appendChild(btn);
+
+    peralatanGroup.innerHTML = "";
+    peralatanGroup.appendChild(wrapper);
+
+    peralatanInput = input;
+
+    attachCommonListeners(peralatanInput);
+
+    btn.addEventListener("click", () => {
+      // balik ke dropdown, reset pilihan
+      useSelectMode("");
+      updateAndSave();
+    });
+
+    input.focus();
+  }
+
+  // --- data awal dari riwayat / template ---
+  if (data) {
+    if (data.waktu) waktuInput.value = normalizeSavedTime(data.waktu);
+
+    if (data.peralatan) {
+      // kompatibilitas data lama
+      let savedPeralatan = data.peralatan === "PMT 20KV" ? "PMT INC 20KV" : data.peralatan;
+
+      const optionValues = Array.from(peralatanSelect.options).map((o) => o.value);
+
+      // kalau nilai tidak ada di dropdown -> pakai input custom
+      if (savedPeralatan && !optionValues.includes(savedPeralatan)) {
+        useCustomMode(savedPeralatan);
+      } else {
+        useSelectMode(savedPeralatan);
+      }
+    } else {
+      useSelectMode("");
+    }
+
+    if (data.bay) bayInput.value = data.bay;
+    if (data.status) statusInput.value = data.status;
+  } else {
+    useSelectMode("");
+  }
+
+  // --- perubahan dropdown peralatan ---
+  peralatanSelect.addEventListener("change", (e) => {
     if (e.target.value === "LAINNYA") {
-      const td = e.target.closest("td");
-
-      const text = document.createElement("input");
-      text.type = "text";
-      text.className = "form-control form-control-sm peralatanInput";
-      text.placeholder = "Isi peralatan...";
-
-      // ganti isi kolom dengan textbox baru
-      td.innerHTML = "";
-      td.appendChild(text);
-
-      // update referensi supaya getRowsData tetap jalan
-      peralatanInput = text;
-
-      text.addEventListener("input", updateAndSave);
-      text.addEventListener("change", updateAndSave);
-      text.focus();
-
+      // ganti ke textbox + tombol X
+      useCustomMode("");
       updateAndSave();
     } else {
-      // kalau bukan "LAINNYA", tetap pakai nilai dari select
+      peralatanInput = peralatanSelect;
       updateAndSave();
     }
   });
 
-  // listener awal untuk select (supaya ikut ter-generate)
-  peralatanInput.addEventListener("input", updateAndSave);
+  // hapus baris
+  const removeBtn = tr.querySelector(".remove-row-btn");
+  removeBtn.addEventListener("click", () => {
+    tr.remove();
+    updateAndSave();
+  });
 }
 
 

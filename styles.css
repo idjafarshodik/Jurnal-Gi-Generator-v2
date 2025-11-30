@@ -390,21 +390,48 @@ body[data-theme="dark"] .flatpickr-time .numInputWrapper span {
     }
   }
 
-  
+
   /* Template switching card – biar enak di mobile */
   .template-switching-card {
     border-radius: 0.9rem;
   }
 
-  .btn-template-switching {
-    min-width: 150px;
+   .peralatan-cancel-btn {
+    border-radius: 999px;
+    padding-inline: 0.45rem;
+    font-size: 0.8rem;
+    line-height: 1;
   }
 
-  @media (max-width: 576px) {
-    .btn-template-switching {
-      width: 100%;
-    }
-}
 
+   .btn-template-switching {
+      min-width: 150px;
+   }
+
+   @media (max-width: 576px) {
+      .btn-template-switching {
+        width: 100%;
+      }
+  }
+  /* Kolom peralatan (dropdown / custom) agar seragam */
+  .peralatan-cell .input-group-sm > .form-select,
+  .peralatan-cell .input-group-sm > .form-control {
+    border-radius: 0.7rem;
+  }
+
+  .peralatan-group .form-select,
+  .peralatan-group .form-control {
+    font-size: 0.88rem;
+  }
+
+  /* Tombol X kecil di sisi kanan input custom */
+  .peralatan-cancel-btn {
+    border-radius: 999px;
+    padding-inline: 0.45rem;
+    font-size: 0.8rem;
+    line-height: 1;
+  }
+
+  
 }
 
