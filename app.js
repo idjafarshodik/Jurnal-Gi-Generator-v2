@@ -3,8 +3,22 @@
   const THEME_KEY = "jurnalGiTheme_v1";
   const HISTORY_KEY = "jurnalGiHistory_v1";
 
-  const SWITCHING_TEMPLATE_KEY = "jurnalGiSwitchingTemplate";    // untuk template pembebasan & penormalan
-  const HISTORY_SELECTED_KEY = "jurnalGiHistorySelected";        // untuk load ulang dari riwayat
+  const { normalizeSavedTime, parseManuverText } = window.ManuverParser;
+
+  const PRESET_AWAL = [
+    { key: "awal1", label: "Semoga pekerjaan diberikan keamanan dan kelancaran🙏" },
+    { key: "awal2", label: "Bismillah, Semoga pekerjaan lancar dan personil aman🙏🏻🙏🏻" },
+    { key: "awal3", label: "Bismillah semoga pekerjaan berjalan lancar personil aman 🤲" },
+  ];
+  const PRESET_AKHIR = [
+    { key: "akhir1", label: "Alhamdulillah pekerjaan sudah selesai dengan dan lancar🙏" },
+    { key: "akhir2", label: "Alhamdulillah pekerjaan sudah selesai dengan aman dan lancar🙏" },
+    { key: "akhir3", label: "Alhamdulillah pekerjaan telah selesai dengan lancar, aman personil dan peralatan, terimakasih 🙏🏻" },
+  ];
+  const PRESET_MAP = {};
+  [...PRESET_AWAL, ...PRESET_AKHIR].forEach((p) => {
+    PRESET_MAP[p.key] = p.label;
+  });
 
   const form = document.getElementById("jurnalForm");
   const previewBox = document.getElementById("previewBox");
@@ -21,23 +35,17 @@
 
   const themeToggleBtn = document.getElementById("themeToggle");
   const themeIcon = document.getElementById("themeIcon");
-  const themeLabel = document.getElementById("themeLabel");
-  const themeHint = document.getElementById("themeHint");
 
   const tanggalInput = document.getElementById("tanggal");
   const hariInput = document.getElementById("hari");
 
-  // ======================= THEME ==========================
   function applyTheme(theme) {
     document.body.setAttribute("data-theme", theme);
+    if (!themeIcon) return;
     if (theme === "dark") {
       themeIcon.textContent = "☀️";
-      themeLabel.textContent = "Light mode";
-      if (themeHint) themeHint.textContent = "Mode gelap aktif";
     } else {
       themeIcon.textContent = "🌙";
-      themeLabel.textContent = "Dark mode";
-      if (themeHint) themeHint.textContent = "Mode terang aktif";
     }
   }
 
@@ -48,7 +56,6 @@
     localStorage.setItem(THEME_KEY, next);
   }
 
-  // ======================= TANGGAL / HARI / WAKTU ==================
   function getHariFromDate(dateStr) {
     if (!dateStr) return "";
     const d = new Date(dateStr + "T00:00:00");
@@ -82,7 +89,6 @@
       allowInput: true,
       minuteIncrement: 1,
       onClose(selectedDates, dateStr) {
-        // rapikan format saat picker ditutup
         const normalized = normalizeSavedTime(dateStr || inputEl.value);
         inputEl.value = normalized;
         updateAndSave();
@@ -95,76 +101,40 @@
   }
 
 
-  function normalizeSavedTime(val) {
-  if (!val) return "";
-
-  const raw = String(val).trim();
-  if (!raw) return "";
-
-  let s = raw.toLowerCase().replace(/,/g, ".").trim();
-
-  // ---- format dengan AM/PM (contoh: "4:05 pm", "4 pm") ----
-  const ampmMatch = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
-  if (ampmMatch) {
-    let hh = parseInt(ampmMatch[1], 10);
-    let mm = parseInt(ampmMatch[2] || "0", 10);
-    const ampm = ampmMatch[3].toLowerCase();
-
-    if (ampm === "am" && hh === 12) hh = 0;
-    if (ampm === "pm" && hh < 12) hh += 12;
-
-    hh = Math.max(0, Math.min(23, isNaN(hh) ? 0 : hh));
-    mm = Math.max(0, Math.min(59, isNaN(mm) ? 0 : mm));
-
-    return String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
+  function sectionHasOnlyEmptyRows(section) {
+    const tbody = section === "pembebasan" ? pembebasanBody : penormalanBody;
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    return rows.every((tr) => {
+      const waktu = tr.querySelector(".waktuInput")?.value.trim();
+      const peralatan = tr.querySelector(".peralatanInput")?.value.trim();
+      const bay = tr.querySelector(".bayInput")?.value.trim();
+      return !waktu && !peralatan && !bay;
+    });
   }
 
-  // ---- format biasa: "16:36", "16.36", "16 36" ----
-  let match = s.match(/(\d{1,2})[^\d]?(\d{2})/);
-  if (!match) {
-    // fallback: ambil digit saja, misal "1636"
-    const digits = raw.replace(/\D/g, "");
-    if (digits.length === 3) {
-      match = [, digits.slice(0, 1), digits.slice(1)];
-    } else if (digits.length === 4) {
-      match = [, digits.slice(0, 2), digits.slice(2)];
-    }
+  function clearSectionRows(section) {
+    const tbody = section === "pembebasan" ? pembebasanBody : penormalanBody;
+    tbody.innerHTML = "";
   }
 
-  if (match) {
-    let hh = parseInt(match[1], 10);
-    let mm = parseInt(match[2], 10);
 
-    if (isNaN(hh) || isNaN(mm)) return raw;
+  const giCache = {};
 
-    hh = Math.max(0, Math.min(23, hh));
-    mm = Math.max(0, Math.min(59, mm));
-
-    return String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
-  }
-
-  // kalau gagal parse, jangan dihapus – pakai mentahnya saja
-  return raw;
-}
-
-
-  // ======================= RIWAYAT (storage) ==================
-  function loadHistory() {
+  async function loadGiCache() {
     try {
-      return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+      const { data, error } = await window.JurnalAuth.supabaseClient
+        .from("gi")
+        .select("id, nama");
+      if (error) throw error;
+      (data || []).forEach((row) => {
+        giCache[row.nama] = row.id;
+      });
     } catch (e) {
-      console.warn("Gagal membaca riwayat:", e);
-      return [];
+      console.warn("Gagal memuat data GI:", e);
     }
   }
 
-  function saveHistory(list) {
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
-    } catch (e) {
-      console.warn("Gagal menyimpan riwayat:", e);
-    }
-  }
+
 
   function getRowsData(section) {
     const tbody = section === "pembebasan" ? pembebasanBody : penormalanBody;
@@ -179,7 +149,6 @@
       const rawWaktu = (waktuEl?.value || "").trim();
       const waktu = normalizeSavedTime(rawWaktu);
 
-      // sekaligus update value di form kalau beda
       if (waktuEl && waktu && waktu !== rawWaktu) {
         waktuEl.value = waktu;
       }
@@ -193,81 +162,135 @@
   }
 
 
-  function saveJournalToHistory(finalText) {
+  async function saveJournalToHistory(finalText) {
     if (!finalText || !finalText.trim()) return;
 
-    const history = loadHistory();
+    const sb = window.JurnalAuth.supabaseClient;
 
-    // Cek jurnal identik (berdasarkan text)
-    if (history.some((item) => item.text === finalText)) {
+    try {
+      const { data: existing, error: checkError } = await sb
+        .from("jurnal_manuver")
+        .select("id")
+        .eq("teks_final", finalText)
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (existing && existing.length) {
+        Swal.fire({
+          toast: true,
+          position: "top-end",
+          icon: "info",
+          title: "Jurnal identik sudah ada di riwayat",
+          showConfirmButton: false,
+          timer: 1700,
+          timerProgressBar: true
+        });
+        return;
+      }
+
+      const namaGiVal = document.getElementById("namaGi").value || "";
+      const tanggalVal = tanggalInput.value || "";
+      const hariVal = hariInput.value || "";
+      const keteranganVal = document.getElementById("keterangan").value || "";
+      const dispatcherVal = document.getElementById("dispatcher").value || "";
+      const pengawasManuverVal = document.getElementById("pengawasManuver").value || "";
+      const pengawasPekerjaanVal = document.getElementById("pengawasPekerjaan").value || "";
+      const pengawasK3Val = document.getElementById("pengawasK3").value || "";
+      const pelaksanaManuverVal = document.getElementById("pelaksanaManuver").value || "";
+      const tahapPenormalanVal = document.getElementById("tahapPenormalanToggle").checked;
+      const pesanPenutupVal =
+        (tahapPenormalanVal
+          ? document.getElementById("pesanPenormalan").value
+          : document.getElementById("pesanPembebasan").value) ||
+        (tahapPenormalanVal ? PRESET_AKHIR[0]?.label : PRESET_AWAL[0]?.label) ||
+        "";
+
+      const pembebasanRows = getRowsData("pembebasan");
+      const penormalanRows = getRowsData("penormalan");
+
+      const { data: inserted, error: insertError } = await sb
+        .from("jurnal_manuver")
+        .insert({
+          gi_id: giCache[namaGiVal] || null,
+          tanggal: tanggalVal || null,
+          hari: hariVal,
+          keterangan: keteranganVal,
+          dispatcher: dispatcherVal,
+          pengawas_manuver: pengawasManuverVal,
+          pengawas_pekerjaan: pengawasPekerjaanVal,
+          pengawas_k3: pengawasK3Val,
+          pelaksana_manuver: pelaksanaManuverVal,
+          pesan_penutup: pesanPenutupVal,
+          teks_final: finalText,
+          dibuat_oleh: window.JurnalAuth.getCurrentUserName() || "-",
+        })
+        .select("id")
+        .single();
+
+      if (insertError) throw insertError;
+
+      const rowsPayload = [
+        ...pembebasanRows.map((r, i) => ({
+          jurnal_id: inserted.id,
+          section: "pembebasan",
+          urutan: i,
+          waktu: r.waktu,
+          peralatan: r.peralatan,
+          bay: r.bay,
+          status: r.status,
+        })),
+        ...penormalanRows.map((r, i) => ({
+          jurnal_id: inserted.id,
+          section: "penormalan",
+          urutan: i,
+          waktu: r.waktu,
+          peralatan: r.peralatan,
+          bay: r.bay,
+          status: r.status,
+        })),
+      ];
+
+      if (rowsPayload.length) {
+        const { error: rowsError } = await sb.from("jurnal_manuver_rows").insert(rowsPayload);
+        if (rowsError) throw rowsError;
+      }
+
+      window.JurnalAuth.markActivity();
+
       Swal.fire({
         toast: true,
         position: "top-end",
-        icon: "info",
-        title: "Jurnal identik sudah ada di riwayat",
+        icon: "success",
+        title: "Jurnal disimpan ke riwayat",
         showConfirmButton: false,
-        timer: 1700,
+        timer: 1600,
         timerProgressBar: true
       });
-      return;
+    } catch (e) {
+      console.warn("Gagal menyimpan riwayat ke Supabase:", e);
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "error",
+        title: "Gagal menyimpan ke riwayat",
+        text: "Cek koneksi internet, coba lagi.",
+        showConfirmButton: false,
+        timer: 2200,
+        timerProgressBar: true
+      });
     }
-
-    const namaGiVal = document.getElementById("namaGi").value || "";
-    const tanggalVal = tanggalInput.value || "";
-    const hariVal = hariInput.value || "";
-    const keteranganVal = document.getElementById("keterangan").value || "";
-    const dispatcherVal = document.getElementById("dispatcher").value || "";
-    const pengawasManuverVal = document.getElementById("pengawasManuver").value || "";
-    const pengawasPekerjaanVal = document.getElementById("pengawasPekerjaan").value || "";
-    const pengawasK3Val = document.getElementById("pengawasK3").value || "";
-    const pelaksanaManuverVal = document.getElementById("pelaksanaManuver").value || "";
-    const pesanPenutupVal = document.getElementById("pesanPenutup").value || "";
-
-    const pembebasanRows = getRowsData("pembebasan");
-    const penormalanRows = getRowsData("penormalan");
-
-    const entry = {
-      id: Date.now(),
-      gi: namaGiVal || "-",
-      tanggal: tanggalVal,
-      hari: hariVal,
-      text: finalText,
-      time: new Date().toISOString(),
-      keterangan: keteranganVal,
-      dispatcher: dispatcherVal,
-      pengawasManuver: pengawasManuverVal,
-      pengawasPekerjaan: pengawasPekerjaanVal,
-      pengawasK3: pengawasK3Val,
-      pelaksanaManuver: pelaksanaManuverVal,
-      pesanPenutup: pesanPenutupVal,
-      pembebasanRows,
-      penormalanRows
-    };
-
-    history.push(entry);
-    saveHistory(history);
-
-    Swal.fire({
-      toast: true,
-      position: "top-end",
-      icon: "success",
-      title: "Jurnal disimpan ke riwayat",
-      showConfirmButton: false,
-      timer: 1600,
-      timerProgressBar: true
-    });
   }
 
-  // ======================= ROW DINAMIS ==================
 function createRow(section, data) {
   const tbody = section === "pembebasan" ? pembebasanBody : penormalanBody;
   const tr = document.createElement("tr");
 
   tr.innerHTML = `
-    <td>
+    <td data-label="Waktu">
       <input type="text" class="form-control form-control-sm waktuInput" placeholder="00:00" />
     </td>
-    <td class="peralatan-cell">
+    <td class="peralatan-cell" data-label="Peralatan">
       <div class="input-group input-group-sm peralatan-group">
         <select class="form-select form-select-sm peralatanInput peralatanSelect">
           <option value="">Pilih Peralatan...</option>
@@ -281,10 +304,10 @@ function createRow(section, data) {
         </select>
       </div>
     </td>
-    <td>
+    <td data-label="Nama Bay">
       <input type="text" class="form-control form-control-sm bayInput" placeholder="Contoh: SAMPANG 2" />
     </td>
-    <td>
+    <td data-label="Status">
       <select class="form-select form-select-sm statusInput">
         <option value="#">#</option>
         <option value="//">//</option>
@@ -303,10 +326,9 @@ function createRow(section, data) {
   const bayInput = tr.querySelector(".bayInput");
   const statusInput = tr.querySelector(".statusInput");
 
-  // peralatan (bisa select / input custom)
   const peralatanGroup = tr.querySelector(".peralatan-group");
   const peralatanSelect = tr.querySelector(".peralatanSelect");
-  let peralatanInput = tr.querySelector(".peralatanInput"); // current (bisa select / input)
+  let peralatanInput = tr.querySelector(".peralatanInput");
 
   initTimePicker(waktuInput);
 
@@ -315,11 +337,18 @@ function createRow(section, data) {
     el.addEventListener("change", updateAndSave);
   }
 
+  waktuInput.addEventListener("blur", () => {
+    const normalized = normalizeSavedTime(waktuInput.value);
+    if (normalized && normalized !== waktuInput.value) {
+      waktuInput.value = normalized;
+      updateAndSave();
+    }
+  });
+
   attachCommonListeners(waktuInput);
   attachCommonListeners(bayInput);
   attachCommonListeners(statusInput);
 
-  // --- mode dropdown normal ---
   function useSelectMode(value) {
     peralatanGroup.innerHTML = "";
     peralatanGroup.appendChild(peralatanSelect);
@@ -330,7 +359,6 @@ function createRow(section, data) {
     attachCommonListeners(peralatanInput);
   }
 
-  // --- mode input custom + tombol X ---
   function useCustomMode(initialValue) {
     const wrapper = document.createElement("div");
     wrapper.className = "input-group input-group-sm";
@@ -357,7 +385,6 @@ function createRow(section, data) {
     attachCommonListeners(peralatanInput);
 
     btn.addEventListener("click", () => {
-      // balik ke dropdown, reset pilihan
       useSelectMode("");
       updateAndSave();
     });
@@ -365,17 +392,21 @@ function createRow(section, data) {
     input.focus();
   }
 
-  // --- data awal dari riwayat / template ---
   if (data) {
-    if (data.waktu) waktuInput.value = normalizeSavedTime(data.waktu);
+    if (data.waktu) {
+      const normalizedWaktu = normalizeSavedTime(data.waktu);
+      if (waktuInput._flatpickr) {
+        waktuInput._flatpickr.setDate(normalizedWaktu, false);
+      } else {
+        waktuInput.value = normalizedWaktu;
+      }
+    }
 
     if (data.peralatan) {
-      // kompatibilitas data lama
       let savedPeralatan = data.peralatan === "PMT 20KV" ? "PMT INC 20KV" : data.peralatan;
 
       const optionValues = Array.from(peralatanSelect.options).map((o) => o.value);
 
-      // kalau nilai tidak ada di dropdown -> pakai input custom
       if (savedPeralatan && !optionValues.includes(savedPeralatan)) {
         useCustomMode(savedPeralatan);
       } else {
@@ -391,10 +422,8 @@ function createRow(section, data) {
     useSelectMode("");
   }
 
-  // --- perubahan dropdown peralatan ---
   peralatanSelect.addEventListener("change", (e) => {
     if (e.target.value === "LAINNYA") {
-      // ganti ke textbox + tombol X
       useCustomMode("");
       updateAndSave();
     } else {
@@ -403,7 +432,6 @@ function createRow(section, data) {
     }
   });
 
-  // hapus baris
   const removeBtn = tr.querySelector(".remove-row-btn");
   removeBtn.addEventListener("click", () => {
     tr.remove();
@@ -412,7 +440,6 @@ function createRow(section, data) {
 }
 
 
-  // ======================= SIMPAN & LOAD FORM ==================
   function saveFormState() {
     const data = {
       namaGi: document.getElementById("namaGi").value || "",
@@ -424,7 +451,9 @@ function createRow(section, data) {
       pengawasPekerjaan: document.getElementById("pengawasPekerjaan").value || "",
       pengawasK3: document.getElementById("pengawasK3").value || "",
       pelaksanaManuver: document.getElementById("pelaksanaManuver").value || "",
-      pesanPenutup: document.getElementById("pesanPenutup").value || "",
+      tahapPenormalan: document.getElementById("tahapPenormalanToggle").checked,
+      pesanPembebasan: document.getElementById("pesanPembebasan").value || "",
+      pesanPenormalan: document.getElementById("pesanPenormalan").value || "",
       pembebasanRows: getRowsData("pembebasan"),
       penormalanRows: getRowsData("penormalan"),
     };
@@ -449,6 +478,7 @@ function createRow(section, data) {
       penormalanBody.innerHTML = "";
       createRow("pembebasan");
       createRow("penormalan");
+      updateStageUI();
       return;
     }
 
@@ -460,7 +490,10 @@ function createRow(section, data) {
     document.getElementById("pengawasPekerjaan").value = data.pengawasPekerjaan || "";
     document.getElementById("pengawasK3").value = data.pengawasK3 || "";
     document.getElementById("pelaksanaManuver").value = data.pelaksanaManuver || "";
-    document.getElementById("pesanPenutup").value = data.pesanPenutup || "";
+    document.getElementById("tahapPenormalanToggle").checked = !!data.tahapPenormalan;
+    document.getElementById("pesanPembebasan").value = data.pesanPembebasan || "";
+    document.getElementById("pesanPenormalan").value = data.pesanPenormalan || "";
+    updateStageUI();
 
     updateHari();
 
@@ -480,7 +513,6 @@ function createRow(section, data) {
     }
   }
 
-  // ======================= GENERATE TEKS ==================
   function generateText() {
     const namaGi = document.getElementById("namaGi").value.trim();
     const tanggal = tanggalInput.value;
@@ -491,7 +523,13 @@ function createRow(section, data) {
     const pengawasPekerjaan = document.getElementById("pengawasPekerjaan").value.trim();
     const pengawasK3 = document.getElementById("pengawasK3").value.trim();
     const pelaksanaManuver = document.getElementById("pelaksanaManuver").value.trim();
-    const pesanPenutup = document.getElementById("pesanPenutup").value.trim();
+    const tahapPenormalan = document.getElementById("tahapPenormalanToggle").checked;
+    const pesanPenutup =
+      (tahapPenormalan
+        ? document.getElementById("pesanPenormalan").value.trim()
+        : document.getElementById("pesanPembebasan").value.trim()) ||
+      (tahapPenormalan ? PRESET_AKHIR[0]?.label : PRESET_AWAL[0]?.label) ||
+      "";
 
     const pembebasanRows = getRowsData("pembebasan");
     const penormalanRows = getRowsData("penormalan");
@@ -513,9 +551,9 @@ function createRow(section, data) {
     let lines = [];
 
     if (namaGi) {
-      lines.push(`JURNAL GI ${namaGi.toUpperCase()}`);
+      lines.push(`*JURNAL GI ${namaGi.toUpperCase()}*`);
     } else {
-      lines.push("JURNAL GI _______");
+      lines.push("*JURNAL GI _______*");
     }
 
     if (hari || tanggal) {
@@ -531,26 +569,26 @@ function createRow(section, data) {
       lines.push("");
     }
 
+    function formatRowLine(row) {
+      const waktu = formatTime(row.waktu);
+      const peralatan = row.peralatan || "______";
+      const status = row.status || "";
+      const bayPart = row.bay ? `BAY ${row.bay.toUpperCase()}` : "";
+      return `${waktu} ${peralatan} ${bayPart} ${status}`.replace(/\s+/g, " ").trim();
+    }
+
     if (pembebasanRows.length) {
       lines.push("Pembebasan tegangan:");
       pembebasanRows.forEach((row) => {
-        const waktu = formatTime(row.waktu);
-        const peralatan = row.peralatan || "______";
-        const bay = row.bay || "______";
-        const status = row.status || "";
-        lines.push(`${waktu} ${peralatan} ${bay} ${status}`.trim());
+        lines.push(formatRowLine(row));
       });
       lines.push("");
     }
 
-    if (penormalanRows.length) {
+    if (penormalanRows.length && tahapPenormalan) {
       lines.push("Penormalan tegangan:");
       penormalanRows.forEach((row) => {
-        const waktu = formatTime(row.waktu);
-        const peralatan = row.peralatan || "______";
-        const bay = row.bay || "______";
-        const status = row.status || "";
-        lines.push(`${waktu} ${peralatan} ${bay} ${status}`.trim());
+        lines.push(formatRowLine(row));
       });
       lines.push("");
     }
@@ -576,12 +614,48 @@ function createRow(section, data) {
     return result;
   }
 
+  function renderPresetOptions(tahapPenormalan) {
+    const presetSelect = document.getElementById("presetPesanPenutup");
+    const list = tahapPenormalan ? PRESET_AKHIR : PRESET_AWAL;
+    const optionsHtml = list.map((p) => `<option value="${p.key}">${p.label}</option>`).join("");
+    presetSelect.innerHTML = `<option value="">Pilih preset pesan (opsional)</option>${optionsHtml}`;
+  }
+
+  function ensureDefaultPesan() {
+    const pesanPembebasanEl = document.getElementById("pesanPembebasan");
+    const pesanPenormalanEl = document.getElementById("pesanPenormalan");
+    if (!pesanPembebasanEl.value.trim() && PRESET_AWAL[0]) {
+      pesanPembebasanEl.value = PRESET_AWAL[0].label;
+    }
+    if (!pesanPenormalanEl.value.trim() && PRESET_AKHIR[0]) {
+      pesanPenormalanEl.value = PRESET_AKHIR[0].label;
+    }
+  }
+
+  function updateStageUI() {
+    const tahapPenormalan = document.getElementById("tahapPenormalanToggle").checked;
+    const pesanPembebasanWrap = document.getElementById("pesanPembebasanWrap");
+    const pesanPenormalanWrap = document.getElementById("pesanPenormalanWrap");
+    const penormalanSection = document.getElementById("penormalanSection");
+
+    penormalanSection.classList.toggle("stage-inactive", !tahapPenormalan);
+    renderPresetOptions(tahapPenormalan);
+    ensureDefaultPesan();
+
+    if (tahapPenormalan) {
+      pesanPembebasanWrap.classList.add("d-none");
+      pesanPenormalanWrap.classList.remove("d-none");
+    } else {
+      pesanPembebasanWrap.classList.remove("d-none");
+      pesanPenormalanWrap.classList.add("d-none");
+    }
+  }
+
   function updateAndSave() {
     saveFormState();
     generateText();
   }
 
-  // ======================= COPY & CLEAR ==================
   async function copyToClipboard() {
     const text = previewBox.textContent || "";
     if (!text.trim()) return;
@@ -638,7 +712,81 @@ function createRow(section, data) {
     });
   }
 
-  // ======================= EVENT LISTENER ==================
+  let importTargetSection = "pembebasan";
+  let importParsedRows = [];
+  const importModalEl = document.getElementById("importTextModal");
+  const importTextArea = document.getElementById("importTextArea");
+  const importPreviewWrap = document.getElementById("importPreviewWrap");
+  const importPreviewBody = document.getElementById("importPreviewBody");
+  const importApplyBtn = document.getElementById("importApplyBtn");
+  const bsImportModal = importModalEl ? new bootstrap.Modal(importModalEl) : null;
+
+  function renderImportPreview() {
+    const text = importTextArea.value;
+    importParsedRows = text.trim() ? parseManuverText(text) : [];
+
+    if (!importParsedRows.length) {
+      importPreviewWrap.classList.add("d-none");
+      importApplyBtn.disabled = true;
+      return;
+    }
+
+    importPreviewBody.innerHTML = importParsedRows
+      .map(
+        (r) => `
+        <tr>
+          <td>${r.waktu || "__:__"}</td>
+          <td>${r.peralatan || "-"}</td>
+          <td>${r.bay || "-"}</td>
+          <td>${r.status}</td>
+        </tr>`
+      )
+      .join("");
+
+    importPreviewWrap.classList.remove("d-none");
+    importApplyBtn.disabled = false;
+  }
+
+  document.querySelectorAll(".btn-import-text").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      importTargetSection = btn.dataset.targetSection || "pembebasan";
+      importTextArea.value = "";
+      importParsedRows = [];
+      importPreviewWrap.classList.add("d-none");
+      importApplyBtn.disabled = true;
+      bsImportModal?.show();
+      setTimeout(() => importTextArea.focus(), 200);
+    });
+  });
+
+  if (importTextArea) {
+    importTextArea.addEventListener("input", renderImportPreview);
+  }
+
+  if (importApplyBtn) {
+    importApplyBtn.addEventListener("click", () => {
+      if (!importParsedRows.length) return;
+
+      if (sectionHasOnlyEmptyRows(importTargetSection)) {
+        clearSectionRows(importTargetSection);
+      }
+
+      importParsedRows.forEach((row) => createRow(importTargetSection, row));
+      updateAndSave();
+      bsImportModal?.hide();
+
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: `${importParsedRows.length} baris ditambahkan`,
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+      });
+    });
+  }
+
   document.getElementById("namaGi").addEventListener("change", updateAndSave);
   tanggalInput.addEventListener("change", () => {
     updateHari();
@@ -650,33 +798,25 @@ function createRow(section, data) {
   document.getElementById("pengawasPekerjaan").addEventListener("input", updateAndSave);
   document.getElementById("pengawasK3").addEventListener("input", updateAndSave);
   document.getElementById("pelaksanaManuver").addEventListener("input", updateAndSave);
-  document.getElementById("pesanPenutup").addEventListener("input", updateAndSave);
+  document.getElementById("pesanPembebasan").addEventListener("input", updateAndSave);
+  document.getElementById("pesanPenormalan").addEventListener("input", updateAndSave);
+  document.getElementById("tahapPenormalanToggle").addEventListener("change", () => {
+    updateStageUI();
+    updateAndSave();
+  });
 
-    // preset pesan penutup
   const presetSelect = document.getElementById("presetPesanPenutup");
     if (presetSelect) {
-      const presetMap = {
-        awal1: "Semoga pekerjaan diberikan keamanan dan kelancaran🙏",
-        awal2: "Bismillah, Semoga pekerjaan lancar dan personil aman🙏🏻🙏🏻",
-        awal3: "Bismillah semoga pekerjaan berjalan lancar personil aman 🤲",
-        akhir1: "Alhamdulillah pekerjaan sudah selesai dengan dan lancar🙏",
-        akhir2: "Alhamdulillah pekerjaan sudah selesai dengan aman dan lancar🙏",
-        akhir3: "Alhamdulillah pekerjaan telah selesai dengan lancar, aman personil dan peralatan, terimakasih 🙏🏻",
-      };
-
       presetSelect.addEventListener("change", () => {
         const key = presetSelect.value;
-        if (!key || !presetMap[key]) return;
+        if (!key || !PRESET_MAP[key]) return;
 
-        const textarea = document.getElementById("pesanPenutup");
+        const tahapPenormalan = document.getElementById("tahapPenormalanToggle").checked;
+        const textarea = document.getElementById(tahapPenormalan ? "pesanPenormalan" : "pesanPembebasan");
         if (!textarea) return;
 
-        const pesan = presetMap[key];
+        textarea.value = PRESET_MAP[key];
 
-        // selalu GANTI isi textarea dengan preset terpilih
-        textarea.value = pesan;
-
-        // reset dropdown ke posisi default
         presetSelect.value = "";
 
         updateAndSave();
@@ -710,13 +850,13 @@ function createRow(section, data) {
     }
   });
 
-  generateBtn.addEventListener("click", () => {
+  generateBtn.addEventListener("click", async () => {
     const result = generateText();
     saveFormState();
 
     const saveHistoryCheckbox = document.getElementById("saveToHistory");
     if (saveHistoryCheckbox && saveHistoryCheckbox.checked) {
-      saveJournalToHistory(result);
+      await saveJournalToHistory(result);
     }
 
     if (!result.trim()) {
@@ -738,78 +878,116 @@ function createRow(section, data) {
   clearAllBtn.addEventListener("click", clearAll);
   themeToggleBtn.addEventListener("click", toggleTheme);
 
-  // ======================= INIT ==================
-  (function init() {
+  (async function init() {
     const savedTheme = localStorage.getItem(THEME_KEY) || "light";
     applyTheme(savedTheme);
 
-    // Load form terakhir
+    loadGiCache();
+
     loadFormState();
 
-    // Jika ada JURNAL dari RIWAYAT yang dipilih (edit/ulang)
-    const historyRaw = localStorage.getItem(HISTORY_SELECTED_KEY);
-    if (historyRaw) {
-      try {
-        const h = JSON.parse(historyRaw);
+    const urlParams = new URLSearchParams(window.location.search);
+    const useHistoryId = urlParams.get("useHistory");
+    const useTemplateId = urlParams.get("useTemplateId");
 
-        document.getElementById("namaGi").value = h.gi || "";
+    if (useHistoryId) {
+      try {
+        const sb = window.JurnalAuth.supabaseClient;
+        const { data: h, error } = await sb
+          .from("jurnal_manuver")
+          .select(
+            "id, tanggal, hari, keterangan, dispatcher, pengawas_manuver, pengawas_pekerjaan, pengawas_k3, pelaksana_manuver, pesan_penutup, gi(nama), jurnal_manuver_rows(section, urutan, waktu, peralatan, bay, status)"
+          )
+          .eq("id", useHistoryId)
+          .single();
+
+        if (error) throw error;
+
+        document.getElementById("namaGi").value = h.gi?.nama || "";
         tanggalInput.value = h.tanggal || "";
         hariInput.value = h.hari || getHariFromDate(h.tanggal || "");
         document.getElementById("keterangan").value = h.keterangan || "";
         document.getElementById("dispatcher").value = h.dispatcher || "";
-        document.getElementById("pengawasManuver").value = h.pengawasManuver || "";
-        document.getElementById("pengawasPekerjaan").value = h.pengawasPekerjaan || "";
-        document.getElementById("pengawasK3").value = h.pengawasK3 || "";
-        document.getElementById("pelaksanaManuver").value = h.pelaksanaManuver || "";
-        document.getElementById("pesanPenutup").value = h.pesanPenutup || "";
+        document.getElementById("pengawasManuver").value = h.pengawas_manuver || "";
+        document.getElementById("pengawasPekerjaan").value = h.pengawas_pekerjaan || "";
+        document.getElementById("pengawasK3").value = h.pengawas_k3 || "";
+        document.getElementById("pelaksanaManuver").value = h.pelaksana_manuver || "";
 
         pembebasanBody.innerHTML = "";
         penormalanBody.innerHTML = "";
 
-        if (Array.isArray(h.pembebasanRows) && h.pembebasanRows.length) {
-          h.pembebasanRows.forEach((row) => createRow("pembebasan", row));
+        const allRows = h.jurnal_manuver_rows || [];
+        const pembebasanRows = allRows
+          .filter((r) => r.section === "pembebasan")
+          .sort((a, b) => a.urutan - b.urutan);
+        const penormalanRows = allRows
+          .filter((r) => r.section === "penormalan")
+          .sort((a, b) => a.urutan - b.urutan);
+
+        const tahapPenormalan = penormalanRows.length > 0;
+        document.getElementById("tahapPenormalanToggle").checked = tahapPenormalan;
+        document.getElementById(tahapPenormalan ? "pesanPenormalan" : "pesanPembebasan").value = h.pesan_penutup || "";
+        updateStageUI();
+
+        if (pembebasanRows.length) {
+          pembebasanRows.forEach((row) => createRow("pembebasan", row));
         } else {
           createRow("pembebasan");
         }
 
-        if (Array.isArray(h.penormalanRows) && h.penormalanRows.length) {
-          h.penormalanRows.forEach((row) => createRow("penormalan", row));
+        if (penormalanRows.length) {
+          penormalanRows.forEach((row) => createRow("penormalan", row));
         } else {
           createRow("penormalan");
         }
       } catch (e) {
-        console.warn("Gagal memuat jurnal dari riwayat:", e);
+        console.error("Gagal memuat jurnal dari riwayat:", e);
+        Swal.fire({
+          icon: "error",
+          title: "Gagal memuat riwayat",
+          text: "Cek koneksi internet, lalu coba lagi dari halaman Riwayat.",
+        });
       }
-      localStorage.removeItem(HISTORY_SELECTED_KEY);
-    }
-
-    // Jika ada TEMPLATE SWITCHING yang dipilih
-    const tplSwitchRaw = localStorage.getItem(SWITCHING_TEMPLATE_KEY);
-    if (tplSwitchRaw) {
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (useTemplateId) {
       try {
-        const tpl = JSON.parse(tplSwitchRaw);
+        const sb = window.JurnalAuth.supabaseClient;
+        const { data: rows, error } = await sb
+          .from("template_manuver_rows")
+          .select("section, urutan, peralatan, bay, status")
+          .eq("template_id", useTemplateId)
+          .order("urutan", { ascending: true });
+
+        if (error) throw error;
 
         pembebasanBody.innerHTML = "";
         penormalanBody.innerHTML = "";
 
-        if (Array.isArray(tpl.pembebasan) && tpl.pembebasan.length) {
-          tpl.pembebasan.forEach((row) => createRow("pembebasan", row));
+        const pembebasanRows = (rows || []).filter((r) => r.section === "pembebasan");
+        const penormalanRows = (rows || []).filter((r) => r.section === "penormalan");
+
+        if (pembebasanRows.length) {
+          pembebasanRows.forEach((row) => createRow("pembebasan", row));
         } else {
           createRow("pembebasan");
         }
 
-        if (Array.isArray(tpl.penormalan) && tpl.penormalan.length) {
-          tpl.penormalan.forEach((row) => createRow("penormalan", row));
+        if (penormalanRows.length) {
+          penormalanRows.forEach((row) => createRow("penormalan", row));
         } else {
           createRow("penormalan");
         }
       } catch (e) {
-        console.warn("Gagal memuat template switching:", e);
+        console.error("Gagal memuat template:", e);
+        Swal.fire({
+          icon: "error",
+          title: "Gagal memuat template",
+          text: "Cek koneksi internet, lalu coba lagi dari halaman Riwayat.",
+        });
       }
-      localStorage.removeItem(SWITCHING_TEMPLATE_KEY);
+      window.history.replaceState({}, "", window.location.pathname);
     }
 
-    // Generate awal
     generateText();
   })();
 })();
