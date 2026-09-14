@@ -5,6 +5,17 @@
 
   const { normalizeSavedTime, parseManuverText } = window.ManuverParser;
 
+  let lastVisiblePart = "";
+  let lastHiddenPart = "";
+
+  function buildReadMoreText(visiblePart, hiddenPart) {
+    if (!hiddenPart) return visiblePart;
+    const targetLength = 1000;
+    const fillerCount = Math.max(0, targetLength - visiblePart.length);
+    const filler = "\u200E".repeat(fillerCount);
+    return visiblePart + filler + hiddenPart;
+  }
+
   const PRESET_AWAL = [
     { key: "awal1", label: "Semoga pekerjaan diberikan keamanan dan kelancaran🙏" },
     { key: "awal2", label: "Bismillah, Semoga pekerjaan lancar dan personil aman🙏🏻🙏🏻" },
@@ -549,6 +560,7 @@ function createRow(section, data) {
     }
 
     let lines = [];
+    let readMoreSplitIndex = 0;
 
     if (namaGi) {
       lines.push(`*JURNAL GI ${namaGi.toUpperCase()}*`);
@@ -568,6 +580,8 @@ function createRow(section, data) {
       lines.push(`Ket: ${keterangan}`);
       lines.push("");
     }
+
+    readMoreSplitIndex = lines.length;
 
     function formatRowLine(row) {
       const waktu = formatTime(row.waktu);
@@ -611,6 +625,8 @@ function createRow(section, data) {
 
     const result = lines.join("\n");
     previewBox.textContent = result || "Belum ada data untuk ditampilkan.";
+    lastVisiblePart = lines.slice(0, readMoreSplitIndex).join("\n");
+    lastHiddenPart = lines.slice(readMoreSplitIndex).join("\n");
     return result;
   }
 
@@ -659,8 +675,15 @@ function createRow(section, data) {
   async function copyToClipboard() {
     const text = previewBox.textContent || "";
     if (!text.trim()) return;
+
+    const waReadMoreToggle = document.getElementById("waReadMoreToggle");
+    const useReadMore = waReadMoreToggle && waReadMoreToggle.checked;
+    const textToCopy = useReadMore
+      ? buildReadMoreText(lastVisiblePart, lastHiddenPart)
+      : text;
+
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(textToCopy);
       Swal.fire({
         toast: true,
         position: "top-end",
