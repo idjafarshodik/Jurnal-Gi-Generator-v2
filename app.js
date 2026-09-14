@@ -11,7 +11,7 @@
   function buildReadMoreText(visiblePart, hiddenPart) {
     if (!hiddenPart) return visiblePart;
     const filler = "\u034F".repeat(3105);
-    return visiblePart + filler + hiddenPart;
+    return visiblePart + filler + "\n" + hiddenPart;
   }
 
   const PRESET_AWAL = [
