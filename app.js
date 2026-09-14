@@ -10,9 +10,7 @@
 
   function buildReadMoreText(visiblePart, hiddenPart) {
     if (!hiddenPart) return visiblePart;
-    const targetLength = 1000;
-    const fillerCount = Math.max(0, targetLength - visiblePart.length);
-    const filler = "\u200E".repeat(fillerCount);
+    const filler = "\u034F".repeat(3105);
     return visiblePart + filler + hiddenPart;
   }
 
