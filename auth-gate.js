@@ -6,6 +6,21 @@ const AUTH_NAME_KEY = "jurnalUserName";
 const AUTH_ACTIVITY_KEY = "jurnalLastActivity";
 const AUTH_EXPIRY_DAYS = 3;
 
+let jurnalReadyResolve;
+let jurnalReadyDone = false;
+const jurnalAuthReady = new Promise((r) => {
+  jurnalReadyResolve = r;
+});
+
+function jurnalSignalReady() {
+  if (jurnalReadyDone) {
+    document.dispatchEvent(new CustomEvent("jurnal:login"));
+    return;
+  }
+  jurnalReadyDone = true;
+  jurnalReadyResolve();
+}
+
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     persistSession: true,
@@ -66,6 +81,7 @@ async function jurnalCheckSession() {
     return;
   }
   jurnalHideAuthGate();
+  jurnalSignalReady();
 }
 
 function jurnalGetCurrentUserName() {
@@ -176,12 +192,14 @@ document.addEventListener("DOMContentLoaded", () => {
       jurnalSetStoredName(name);
       jurnalMarkActivity();
       jurnalHideAuthGate();
+      jurnalSignalReady();
     });
   }
 });
 
 window.JurnalAuth = {
   supabaseClient,
+  ready: jurnalAuthReady,
   getCurrentUserName: jurnalGetCurrentUserName,
   markActivity: jurnalMarkActivity,
   runAsAdmin: jurnalRunAsAdmin,
