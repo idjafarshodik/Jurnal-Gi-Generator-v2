@@ -94,6 +94,7 @@
       enableSeconds: false,
       dateFormat: "H:i",
       allowInput: true,
+      disableMobile: true,
       minuteIncrement: 1,
       onClose(selectedDates, dateStr) {
         const normalized = normalizeSavedTime(dateStr || inputEl.value);
