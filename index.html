@@ -72,8 +72,8 @@
               <button type="button" id="themeToggle" class="btn btn-sm btn-outline-secondary btn-toggle-theme">
                 <span id="themeIcon">🌙</span>
               </button>
-              <button type="button" id="clearAllBtn" class="btn btn-sm btn-outline-danger">
-                Clear All
+              <button type="button" id="newJurnalBtn" class="btn btn-sm btn-outline-accent">
+                + Jurnal Baru
               </button>
               <button type="button" id="authLogoutBtn" class="btn btn-sm btn-outline-secondary" title="Keluar">
                 Keluar
@@ -298,39 +298,51 @@
               </div>
 
 
-              <div class="col-12 action-bar">
-                <div class="action-bar-options">
-                  <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" id="saveToHistory" checked>
-                    <label class="form-check-label small" for="saveToHistory">
-                      Simpan ke riwayat
-                    </label>
-                  </div>
-                  <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" id="waReadMoreToggle">
-                    <label class="form-check-label small" for="waReadMoreToggle">
-                      "Baca Selengkapnya" saat disalin
-                    </label>
-                  </div>
-                </div>
-                <div class="action-bar-inner">
-                  <button type="button" id="generateBtn" class="btn btn-accent btn-cta">
-                    Generate Jurnal
-                  </button>
-                  <button type="button" id="copyBtn" class="btn btn-outline-accent">
-                    Copy ke Clipboard
-                  </button>
-                </div>
-              </div>
-
-              <div class="col-12 mt-3">
-                <div class="d-flex align-items-center justify-content-between mb-1">
-                  <label class="form-label mb-0">Preview / Hasil</label>
-                  <span class="status-lamp">Live</span>
-                </div>
-                <div id="previewBox" class="preview-box">Klik atau ubah form untuk melihat hasil di sini.</div>
-              </div>
             </form>
+
+            <div class="offcanvas-lg offcanvas-bottom preview-panel" tabindex="-1" id="previewPanel" aria-labelledby="previewPanelLabel">
+              <div class="offcanvas-header">
+                <h2 class="h6 mb-0" id="previewPanelLabel">Preview Jurnal</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#previewPanel" aria-label="Tutup"></button>
+              </div>
+              <div class="offcanvas-body">
+                <div class="preview-panel-inner">
+                  <div class="preview-panel-head">
+                    <label class="form-label mb-0 d-none d-lg-inline-flex align-items-center gap-2">
+                      Preview / Hasil <span class="status-lamp">Live</span>
+                    </label>
+                    <div class="form-check form-switch mb-0">
+                      <input class="form-check-input" type="checkbox" id="waReadMoreToggle">
+                      <label class="form-check-label small" for="waReadMoreToggle">
+                        "Baca Selengkapnya" saat disalin
+                      </label>
+                    </div>
+                  </div>
+                  <div id="previewBox" class="preview-box">Isi form untuk melihat hasil di sini.</div>
+                  <button type="button" id="copyBtnSheet" class="btn btn-accent btn-cta w-100 mt-3 d-lg-none">
+                    Salin &amp; Simpan
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="action-bar" id="actionBar">
+              <div id="saveStatus" class="save-status" data-state="empty" role="status" aria-live="polite">
+                <span class="save-dot"></span>
+                <span id="saveStatusText">Jurnal baru</span>
+              </div>
+              <div class="action-bar-inner">
+                <button type="button" class="btn btn-outline-secondary btn-preview d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#previewPanel" aria-controls="previewPanel">
+                  Preview
+                </button>
+                <button type="button" id="saveBtn" class="btn btn-outline-accent">
+                  Simpan
+                </button>
+                <button type="button" id="copyBtn" class="btn btn-accent btn-cta">
+                  Salin &amp; Simpan
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="card-footer border-0 pt-0 px-3 px-md-4 pb-3">

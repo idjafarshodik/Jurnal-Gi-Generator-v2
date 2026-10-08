@@ -1,7 +1,6 @@
 (function () {
   const STORAGE_KEY = "jurnalGiForm_v4";
   const THEME_KEY = "jurnalGiTheme_v1";
-  const HISTORY_KEY = "jurnalGiHistory_v1";
 
   const { normalizeSavedTime, parseManuverText } = window.ManuverParser;
 
@@ -38,9 +37,8 @@
   const addPembebasanRowBtn = document.getElementById("addPembebasanRow");
   const addPenormalanRowBtn = document.getElementById("addPenormalanRow");
 
-  const generateBtn = document.getElementById("generateBtn");
   const copyBtn = document.getElementById("copyBtn");
-  const clearAllBtn = document.getElementById("clearAllBtn");
+  const newJurnalBtn = document.getElementById("newJurnalBtn");
 
   const themeToggleBtn = document.getElementById("themeToggle");
   const themeIcon = document.getElementById("themeIcon");
@@ -171,124 +169,446 @@
   }
 
 
-  async function saveJournalToHistory(finalText) {
-    if (!finalText || !finalText.trim()) return;
+  const ACTIVE_KEY = "jurnalGiActive_v1";
+  const EMPTY_ACTIVE = { id: null, updatedAt: null, savedSnapshot: null };
+
+  const saveStatusEl = document.getElementById("saveStatus");
+  const saveStatusText = document.getElementById("saveStatusText");
+  const saveBtn = document.getElementById("saveBtn");
+  const copyBtnSheet = document.getElementById("copyBtnSheet");
+
+  let active = loadActive();
+  let isSaving = false;
+
+  function loadActive() {
+    try {
+      const a = JSON.parse(localStorage.getItem(ACTIVE_KEY) || "null");
+      if (a && typeof a === "object") {
+        return {
+          id: a.id ?? null,
+          updatedAt: a.updatedAt ?? null,
+          savedSnapshot: a.savedSnapshot ?? null,
+        };
+      }
+    } catch (e) {}
+    return { ...EMPTY_ACTIVE };
+  }
+
+  function persistActive(dirty) {
+    try {
+      localStorage.setItem(ACTIVE_KEY, JSON.stringify({ ...active, dirty: !!dirty }));
+    } catch (e) {}
+  }
+
+  function fieldVal(id) {
+    const el = document.getElementById(id);
+    return el ? el.value || "" : "";
+  }
+
+  function getPesanPenutup(tahapPenormalan) {
+    return (
+      (tahapPenormalan ? fieldVal("pesanPenormalan") : fieldVal("pesanPembebasan")).trim() ||
+      (tahapPenormalan ? PRESET_AKHIR[0]?.label : PRESET_AWAL[0]?.label) ||
+      ""
+    );
+  }
+
+  function collectFormData() {
+    const tahapPenormalan = document.getElementById("tahapPenormalanToggle").checked;
+    return {
+      namaGi: fieldVal("namaGi"),
+      tanggal: tanggalInput.value || "",
+      hari: hariInput.value || "",
+      keterangan: fieldVal("keterangan"),
+      dispatcher: fieldVal("dispatcher"),
+      pengawasManuver: fieldVal("pengawasManuver"),
+      pengawasPekerjaan: fieldVal("pengawasPekerjaan"),
+      pengawasK3: fieldVal("pengawasK3"),
+      pelaksanaManuver: fieldVal("pelaksanaManuver"),
+      tahapPenormalan,
+      pesanPenutup: getPesanPenutup(tahapPenormalan),
+      pembebasanRows: getRowsData("pembebasan"),
+      penormalanRows: getRowsData("penormalan"),
+    };
+  }
+
+  function hasContent(d) {
+    return !!(
+      d.namaGi ||
+      d.tanggal ||
+      d.keterangan.trim() ||
+      d.dispatcher.trim() ||
+      d.pengawasManuver.trim() ||
+      d.pengawasPekerjaan.trim() ||
+      d.pengawasK3.trim() ||
+      d.pelaksanaManuver.trim() ||
+      d.pembebasanRows.length ||
+      d.penormalanRows.length
+    );
+  }
+
+  function isDirty() {
+    const d = collectFormData();
+    if (active.id == null) return hasContent(d);
+    return JSON.stringify(d) !== active.savedSnapshot;
+  }
+
+  function parseIso(iso) {
+    if (!iso) return null;
+    const d = new Date(String(iso).replace(/(\.\d{3})\d+/, "$1"));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function formatSavedAt(iso) {
+    const d = parseIso(iso);
+    if (!d) return "";
+    const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) return hhmm;
+    const bln = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"][d.getMonth()];
+    return `${d.getDate()} ${bln} ${hhmm}`;
+  }
+
+  function refreshSaveStatus() {
+    const dirty = isDirty();
+    persistActive(dirty);
+    if (!saveStatusEl || !saveStatusText) return;
+
+    let state;
+    let text;
+    if (isSaving) {
+      state = "saving";
+      text = "Menyimpan...";
+    } else if (active.id == null) {
+      state = dirty ? "dirty" : "empty";
+      text = dirty ? "Jurnal baru · belum disimpan" : "Jurnal baru";
+    } else if (dirty) {
+      state = "dirty";
+      text = `Jurnal #${active.id} · ada perubahan belum disimpan`;
+    } else {
+      state = "saved";
+      text = `Jurnal #${active.id} · tersimpan ${formatSavedAt(active.updatedAt)}`;
+    }
+
+    saveStatusEl.dataset.state = state;
+    saveStatusText.textContent = text;
+  }
+
+  function setBusy(busy) {
+    [saveBtn, copyBtn, copyBtnSheet].forEach((b) => {
+      if (b) b.disabled = busy;
+    });
+  }
+
+  function toast(icon, title, text, timer = 1800) {
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon,
+      title,
+      text,
+      showConfirmButton: false,
+      timer,
+      timerProgressBar: true,
+    });
+  }
+
+  function classifySaveError(e) {
+    const msg = (e && (e.message || e.details || "")) || "";
+    if (msg.includes("JURNAL_KONFLIK")) return "konflik";
+    if (msg.includes("JURNAL_TIDAK_ADA")) return "hilang";
+    return "error";
+  }
+
+  async function saveJurnal(opts = {}) {
+    if (isSaving) return { ok: false, reason: "busy" };
+
+    const data = collectFormData();
+    if (!data.tanggal) {
+      if (!opts.quiet) toast("warning", "Tanggal belum diisi", "Isi tanggal dulu supaya jurnal bisa disimpan.", 2200);
+      return { ok: false, reason: "invalid" };
+    }
+
+    if (!Object.keys(giCache).length) await loadGiCache();
 
     const sb = window.JurnalAuth.supabaseClient;
+    const teksFinal = generateText();
+    const targetId = opts.asNew ? null : active.id;
+    const expected = targetId == null || opts.force ? null : active.updatedAt;
 
+    const header = {
+      gi_id: giCache[data.namaGi] || null,
+      tanggal: data.tanggal,
+      hari: data.hari,
+      keterangan: data.keterangan,
+      dispatcher: data.dispatcher,
+      pengawas_manuver: data.pengawasManuver,
+      pengawas_pekerjaan: data.pengawasPekerjaan,
+      pengawas_k3: data.pengawasK3,
+      pelaksana_manuver: data.pelaksanaManuver,
+      pesan_penutup: data.pesanPenutup,
+      teks_final: teksFinal,
+      tahap_penormalan: data.tahapPenormalan,
+      user: window.JurnalAuth.getCurrentUserName() || "-",
+    };
+
+    const rows = [
+      ...data.pembebasanRows.map((r, i) => ({ section: "pembebasan", urutan: i, ...r })),
+      ...data.penormalanRows.map((r, i) => ({ section: "penormalan", urutan: i, ...r })),
+    ];
+
+    isSaving = true;
+    setBusy(true);
+    refreshSaveStatus();
+
+    let outcome;
     try {
-      const { data: existing, error: checkError } = await sb
-        .from("jurnal_manuver")
-        .select("id")
-        .eq("teks_final", finalText)
-        .limit(1);
+      const { data: res, error } = await sb.rpc("simpan_jurnal", {
+        p_id: targetId,
+        p_header: header,
+        p_rows: rows,
+        p_expected_updated_at: expected,
+      });
+      if (error) throw error;
 
-      if (checkError) throw checkError;
-
-      if (existing && existing.length) {
-        Swal.fire({
-          toast: true,
-          position: "top-end",
-          icon: "info",
-          title: "Jurnal identik sudah ada di riwayat",
-          showConfirmButton: false,
-          timer: 1700,
-          timerProgressBar: true
-        });
-        return;
-      }
-
-      const namaGiVal = document.getElementById("namaGi").value || "";
-      const tanggalVal = tanggalInput.value || "";
-      const hariVal = hariInput.value || "";
-      const keteranganVal = document.getElementById("keterangan").value || "";
-      const dispatcherVal = document.getElementById("dispatcher").value || "";
-      const pengawasManuverVal = document.getElementById("pengawasManuver").value || "";
-      const pengawasPekerjaanVal = document.getElementById("pengawasPekerjaan").value || "";
-      const pengawasK3Val = document.getElementById("pengawasK3").value || "";
-      const pelaksanaManuverVal = document.getElementById("pelaksanaManuver").value || "";
-      const tahapPenormalanVal = document.getElementById("tahapPenormalanToggle").checked;
-      const pesanPenutupVal =
-        (tahapPenormalanVal
-          ? document.getElementById("pesanPenormalan").value
-          : document.getElementById("pesanPembebasan").value) ||
-        (tahapPenormalanVal ? PRESET_AKHIR[0]?.label : PRESET_AWAL[0]?.label) ||
-        "";
-
-      const pembebasanRows = getRowsData("pembebasan");
-      const penormalanRows = getRowsData("penormalan");
-
-      const { data: inserted, error: insertError } = await sb
-        .from("jurnal_manuver")
-        .insert({
-          gi_id: giCache[namaGiVal] || null,
-          tanggal: tanggalVal || null,
-          hari: hariVal,
-          keterangan: keteranganVal,
-          dispatcher: dispatcherVal,
-          pengawas_manuver: pengawasManuverVal,
-          pengawas_pekerjaan: pengawasPekerjaanVal,
-          pengawas_k3: pengawasK3Val,
-          pelaksana_manuver: pelaksanaManuverVal,
-          pesan_penutup: pesanPenutupVal,
-          teks_final: finalText,
-          dibuat_oleh: window.JurnalAuth.getCurrentUserName() || "-",
-        })
-        .select("id")
-        .single();
-
-      if (insertError) throw insertError;
-
-      const rowsPayload = [
-        ...pembebasanRows.map((r, i) => ({
-          jurnal_id: inserted.id,
-          section: "pembebasan",
-          urutan: i,
-          waktu: r.waktu,
-          peralatan: r.peralatan,
-          bay: r.bay,
-          status: r.status,
-        })),
-        ...penormalanRows.map((r, i) => ({
-          jurnal_id: inserted.id,
-          section: "penormalan",
-          urutan: i,
-          waktu: r.waktu,
-          peralatan: r.peralatan,
-          bay: r.bay,
-          status: r.status,
-        })),
-      ];
-
-      if (rowsPayload.length) {
-        const { error: rowsError } = await sb.from("jurnal_manuver_rows").insert(rowsPayload);
-        if (rowsError) throw rowsError;
-      }
-
+      active = {
+        id: res.id,
+        updatedAt: res.updated_at,
+        savedSnapshot: JSON.stringify(data),
+      };
       window.JurnalAuth.markActivity();
-
-      Swal.fire({
-        toast: true,
-        position: "top-end",
-        icon: "success",
-        title: "Jurnal disimpan ke riwayat",
-        showConfirmButton: false,
-        timer: 1600,
-        timerProgressBar: true
-      });
+      outcome = { ok: true, id: res.id, created: targetId == null };
     } catch (e) {
-      console.warn("Gagal menyimpan riwayat ke Supabase:", e);
-      Swal.fire({
-        toast: true,
-        position: "top-end",
-        icon: "error",
-        title: "Gagal menyimpan ke riwayat",
-        text: "Cek koneksi internet, coba lagi.",
-        showConfirmButton: false,
-        timer: 2200,
-        timerProgressBar: true
-      });
+      console.warn("Gagal menyimpan jurnal:", e);
+      outcome = { ok: false, reason: classifySaveError(e) };
+    } finally {
+      isSaving = false;
+      setBusy(false);
+      refreshSaveStatus();
     }
+
+    if (outcome.reason === "konflik") return handleConflict(opts);
+    if (outcome.reason === "hilang") return handleMissing(opts);
+    return outcome;
+  }
+
+  async function handleConflict(opts) {
+    let info = "";
+    try {
+      const { data } = await window.JurnalAuth.supabaseClient
+        .from("jurnal_manuver")
+        .select("updated_at, diubah_oleh")
+        .eq("id", active.id)
+        .single();
+      if (data) {
+        info = `Terakhir disimpan${data.diubah_oleh ? ` oleh ${data.diubah_oleh}` : ""} jam ${formatSavedAt(data.updated_at)}, setelah kamu membukanya.`;
+      }
+    } catch (e) {}
+
+    const res = await Swal.fire({
+      icon: "warning",
+      title: `Jurnal #${active.id} sudah diubah dari device lain`,
+      text: `${info} Pilih versi mana yang mau dipakai.`.trim(),
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonText: "Muat versi terbaru",
+      denyButtonText: "Timpa dengan versi saya",
+      cancelButtonText: "Batal",
+    });
+
+    if (res.isDenied) return saveJurnal({ ...opts, force: true });
+    if (res.isConfirmed) {
+      await loadJurnalIntoForm(active.id, "lanjutkan");
+      return { ok: false, reason: "reloaded" };
+    }
+    return { ok: false, reason: "cancelled" };
+  }
+
+  async function handleMissing(opts) {
+    const res = await Swal.fire({
+      icon: "warning",
+      title: `Jurnal #${active.id} sudah tidak ada`,
+      text: "Kemungkinan sudah dihapus admin. Simpan isian ini sebagai jurnal baru?",
+      showCancelButton: true,
+      confirmButtonText: "Simpan sebagai baru",
+      cancelButtonText: "Batal",
+    });
+    if (res.isConfirmed) return saveJurnal({ ...opts, asNew: true });
+    return { ok: false, reason: "cancelled" };
+  }
+
+  async function writeClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove();
+        return ok;
+      } catch (e2) {
+        return false;
+      }
+    }
+  }
+
+  async function onSaveClick() {
+    if (active.id != null && !isDirty()) {
+      toast("info", `Jurnal #${active.id} sudah tersimpan`, "", 1500);
+      return;
+    }
+    const r = await saveJurnal();
+    if (r.ok) {
+      toast("success", r.created ? `Tersimpan sebagai Jurnal #${r.id}` : `Perubahan Jurnal #${r.id} disimpan`, "", 1700);
+    } else if (r.reason === "error") {
+      toast("error", "Gagal menyimpan", "Cek koneksi internet, lalu coba lagi.", 2400);
+    }
+  }
+
+  async function copyAndSave() {
+    const text = generateText();
+    if (!text.trim()) return;
+
+    const waReadMoreToggle = document.getElementById("waReadMoreToggle");
+    const useReadMore = waReadMoreToggle && waReadMoreToggle.checked;
+    const textToCopy = useReadMore ? buildReadMoreText(lastVisiblePart, lastHiddenPart) : text;
+
+    const copied = await writeClipboard(textToCopy);
+    if (!copied) {
+      Swal.fire({ icon: "error", title: "Gagal menyalin", text: "Silakan salin manual dari preview." });
+      return;
+    }
+
+    if (active.id != null && !isDirty()) {
+      toast("success", "Tersalin", `Jurnal #${active.id} sudah tersimpan.`, 1600);
+      return;
+    }
+
+    if (!tanggalInput.value) {
+      toast("warning", "Tersalin, tapi belum disimpan", "Tanggal belum diisi.", 2400);
+      return;
+    }
+
+    const r = await saveJurnal({ quiet: true });
+    if (r.ok) {
+      toast("success", "Tersalin & tersimpan", `Jurnal #${r.id}`, 1700);
+    } else if (r.reason === "error") {
+      toast("warning", "Tersalin, tapi gagal disimpan", "Cek koneksi, lalu tekan Simpan.", 2600);
+    }
+  }
+
+  function resetFormToEmpty() {
+    localStorage.removeItem(STORAGE_KEY);
+    form.reset();
+    document.getElementById("pesanPembebasan").value = "";
+    document.getElementById("pesanPenormalan").value = "";
+    pembebasanBody.innerHTML = "";
+    penormalanBody.innerHTML = "";
+    createRow("pembebasan");
+    createRow("penormalan");
+    hariInput.value = "";
+    updateStageUI();
+    active = { ...EMPTY_ACTIVE };
+    generateText();
+    saveFormState();
+    refreshSaveStatus();
+  }
+
+  async function startNewJurnal() {
+    if (isDirty()) {
+      const res = await Swal.fire({
+        icon: "warning",
+        title: "Ada perubahan yang belum disimpan",
+        text:
+          active.id != null
+            ? `Perubahan di Jurnal #${active.id} belum tersimpan ke riwayat.`
+            : "Jurnal ini belum pernah disimpan ke riwayat.",
+        showDenyButton: true,
+        showCancelButton: true,
+        confirmButtonText: "Simpan dulu",
+        denyButtonText: "Buang",
+        cancelButtonText: "Batal",
+      });
+      if (res.isDismissed) return;
+      if (res.isConfirmed) {
+        const r = await saveJurnal();
+        if (!r.ok) {
+          if (r.reason === "error") toast("error", "Gagal menyimpan", "Cek koneksi internet, lalu coba lagi.", 2400);
+          return;
+        }
+      }
+    }
+
+    resetFormToEmpty();
+    toast("success", "Siap untuk jurnal baru", "", 1300);
+  }
+
+  function todayIso() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  async function loadJurnalIntoForm(id, mode) {
+    const sb = window.JurnalAuth.supabaseClient;
+    const { data: h, error } = await sb
+      .from("jurnal_manuver")
+      .select(
+        "id, tanggal, hari, keterangan, dispatcher, pengawas_manuver, pengawas_pekerjaan, pengawas_k3, pelaksana_manuver, pesan_penutup, tahap_penormalan, updated_at, gi(nama), jurnal_manuver_rows(section, urutan, waktu, peralatan, bay, status)"
+      )
+      .eq("id", id)
+      .single();
+
+    if (error) throw error;
+
+    const asBase = mode === "dasar";
+    const allRows = h.jurnal_manuver_rows || [];
+    const pembebasanRows = allRows.filter((r) => r.section === "pembebasan").sort((a, b) => a.urutan - b.urutan);
+    const penormalanRows = allRows.filter((r) => r.section === "penormalan").sort((a, b) => a.urutan - b.urutan);
+    const tahapPenormalan = asBase ? false : h.tahap_penormalan ?? penormalanRows.length > 0;
+
+    document.getElementById("namaGi").value = h.gi?.nama || "";
+    tanggalInput.value = asBase ? todayIso() : h.tanggal || "";
+    hariInput.value = asBase ? getHariFromDate(tanggalInput.value) : h.hari || getHariFromDate(h.tanggal || "");
+    document.getElementById("keterangan").value = h.keterangan || "";
+    document.getElementById("dispatcher").value = h.dispatcher || "";
+    document.getElementById("pengawasManuver").value = h.pengawas_manuver || "";
+    document.getElementById("pengawasPekerjaan").value = h.pengawas_pekerjaan || "";
+    document.getElementById("pengawasK3").value = h.pengawas_k3 || "";
+    document.getElementById("pelaksanaManuver").value = h.pelaksana_manuver || "";
+
+    document.getElementById("pesanPembebasan").value = "";
+    document.getElementById("pesanPenormalan").value = "";
+    if (!asBase) {
+      document.getElementById(tahapPenormalan ? "pesanPenormalan" : "pesanPembebasan").value = h.pesan_penutup || "";
+    }
+    document.getElementById("tahapPenormalanToggle").checked = tahapPenormalan;
+    updateStageUI();
+
+    pembebasanBody.innerHTML = "";
+    penormalanBody.innerHTML = "";
+    const prep = (r) => (asBase ? { ...r, waktu: "" } : r);
+
+    if (pembebasanRows.length) pembebasanRows.forEach((r) => createRow("pembebasan", prep(r)));
+    else createRow("pembebasan");
+
+    if (penormalanRows.length) penormalanRows.forEach((r) => createRow("penormalan", prep(r)));
+    else createRow("penormalan");
+
+    generateText();
+    saveFormState();
+
+    active = asBase
+      ? { ...EMPTY_ACTIVE }
+      : { id: h.id, updatedAt: h.updated_at, savedSnapshot: JSON.stringify(collectFormData()) };
+
+    refreshSaveStatus();
   }
 
 function createRow(section, data) {
@@ -668,69 +988,7 @@ function createRow(section, data) {
   function updateAndSave() {
     saveFormState();
     generateText();
-  }
-
-  async function copyToClipboard() {
-    const text = previewBox.textContent || "";
-    if (!text.trim()) return;
-
-    const waReadMoreToggle = document.getElementById("waReadMoreToggle");
-    const useReadMore = waReadMoreToggle && waReadMoreToggle.checked;
-    const textToCopy = useReadMore
-      ? buildReadMoreText(lastVisiblePart, lastHiddenPart)
-      : text;
-
-    try {
-      await navigator.clipboard.writeText(textToCopy);
-      Swal.fire({
-        toast: true,
-        position: "top-end",
-        icon: "success",
-        title: "Tersalin ke clipboard",
-        showConfirmButton: false,
-        timer: 1500,
-        timerProgressBar: true
-      });
-    } catch (e) {
-      Swal.fire({
-        icon: "error",
-        title: "Gagal menyalin",
-        text: "Silakan copy manual.",
-      });
-    }
-  }
-
-  function clearAll() {
-    Swal.fire({
-      title: "Reset formulir?",
-      text: "Semua isian form akan dikosongkan (riwayat tetap aman).",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Ya, reset",
-      cancelButtonText: "Batal",
-    }).then((result) => {
-      if (!result.isConfirmed) return;
-
-      localStorage.removeItem(STORAGE_KEY);
-      form.reset();
-      pembebasanBody.innerHTML = "";
-      penormalanBody.innerHTML = "";
-      createRow("pembebasan");
-      createRow("penormalan");
-      hariInput.value = "";
-      previewBox.textContent =
-        "Klik atau ubah form untuk melihat hasil di sini.";
-
-      Swal.fire({
-        toast: true,
-        position: "top-end",
-        icon: "success",
-        title: "Formulir dikosongkan",
-        showConfirmButton: false,
-        timer: 1300,
-        timerProgressBar: true
-      });
-    });
+    refreshSaveStatus();
   }
 
   let importTargetSection = "pembebasan";
@@ -871,96 +1129,44 @@ function createRow(section, data) {
     }
   });
 
-  generateBtn.addEventListener("click", async () => {
-    const result = generateText();
-    saveFormState();
+  if (saveBtn) saveBtn.addEventListener("click", onSaveClick);
+  if (copyBtn) copyBtn.addEventListener("click", copyAndSave);
+  if (copyBtnSheet) copyBtnSheet.addEventListener("click", copyAndSave);
+  if (newJurnalBtn) newJurnalBtn.addEventListener("click", startNewJurnal);
+  if (themeToggleBtn) themeToggleBtn.addEventListener("click", toggleTheme);
 
-    const saveHistoryCheckbox = document.getElementById("saveToHistory");
-    if (saveHistoryCheckbox && saveHistoryCheckbox.checked) {
-      await saveJournalToHistory(result);
-    }
-
-    if (!result.trim()) {
-      previewBox.textContent = "Belum ada data yang diisi.";
-    } else {
-      Swal.fire({
-        toast: true,
-        position: "top-end",
-        icon: "success",
-        title: "Jurnal digenerate",
-        showConfirmButton: false,
-        timer: 1100,
-        timerProgressBar: true
-      });
+  window.addEventListener("beforeunload", (e) => {
+    if (isSaving || isDirty()) {
+      e.preventDefault();
+      e.returnValue = "";
     }
   });
 
-  copyBtn.addEventListener("click", copyToClipboard);
-  clearAllBtn.addEventListener("click", clearAll);
-  themeToggleBtn.addEventListener("click", toggleTheme);
+  window.addEventListener("storage", (e) => {
+    if (e.key === ACTIVE_KEY) active = loadActive();
+  });
 
   (async function init() {
     const savedTheme = localStorage.getItem(THEME_KEY) || "light";
     applyTheme(savedTheme);
 
     loadGiCache();
-
     loadFormState();
 
     const urlParams = new URLSearchParams(window.location.search);
-    const useHistoryId = urlParams.get("useHistory");
+    const lanjutkanId = urlParams.get("lanjutkan");
+    const dasarId = urlParams.get("useHistory");
     const useTemplateId = urlParams.get("useTemplateId");
 
-    if (useHistoryId) {
+    if (lanjutkanId || dasarId) {
       try {
-        const sb = window.JurnalAuth.supabaseClient;
-        const { data: h, error } = await sb
-          .from("jurnal_manuver")
-          .select(
-            "id, tanggal, hari, keterangan, dispatcher, pengawas_manuver, pengawas_pekerjaan, pengawas_k3, pelaksana_manuver, pesan_penutup, gi(nama), jurnal_manuver_rows(section, urutan, waktu, peralatan, bay, status)"
-          )
-          .eq("id", useHistoryId)
-          .single();
-
-        if (error) throw error;
-
-        document.getElementById("namaGi").value = h.gi?.nama || "";
-        tanggalInput.value = h.tanggal || "";
-        hariInput.value = h.hari || getHariFromDate(h.tanggal || "");
-        document.getElementById("keterangan").value = h.keterangan || "";
-        document.getElementById("dispatcher").value = h.dispatcher || "";
-        document.getElementById("pengawasManuver").value = h.pengawas_manuver || "";
-        document.getElementById("pengawasPekerjaan").value = h.pengawas_pekerjaan || "";
-        document.getElementById("pengawasK3").value = h.pengawas_k3 || "";
-        document.getElementById("pelaksanaManuver").value = h.pelaksana_manuver || "";
-
-        pembebasanBody.innerHTML = "";
-        penormalanBody.innerHTML = "";
-
-        const allRows = h.jurnal_manuver_rows || [];
-        const pembebasanRows = allRows
-          .filter((r) => r.section === "pembebasan")
-          .sort((a, b) => a.urutan - b.urutan);
-        const penormalanRows = allRows
-          .filter((r) => r.section === "penormalan")
-          .sort((a, b) => a.urutan - b.urutan);
-
-        const tahapPenormalan = penormalanRows.length > 0;
-        document.getElementById("tahapPenormalanToggle").checked = tahapPenormalan;
-        document.getElementById(tahapPenormalan ? "pesanPenormalan" : "pesanPembebasan").value = h.pesan_penutup || "";
-        updateStageUI();
-
-        if (pembebasanRows.length) {
-          pembebasanRows.forEach((row) => createRow("pembebasan", row));
-        } else {
-          createRow("pembebasan");
-        }
-
-        if (penormalanRows.length) {
-          penormalanRows.forEach((row) => createRow("penormalan", row));
-        } else {
-          createRow("penormalan");
-        }
+        await loadJurnalIntoForm(lanjutkanId || dasarId, lanjutkanId ? "lanjutkan" : "dasar");
+        toast(
+          "success",
+          lanjutkanId ? `Melanjutkan Jurnal #${lanjutkanId}` : "Jurnal baru dari riwayat",
+          lanjutkanId ? "" : "Tanggal diset hari ini, jam manuver dikosongkan.",
+          1900
+        );
       } catch (e) {
         console.error("Gagal memuat jurnal dari riwayat:", e);
         Swal.fire({
@@ -987,17 +1193,16 @@ function createRow(section, data) {
         const pembebasanRows = (rows || []).filter((r) => r.section === "pembebasan");
         const penormalanRows = (rows || []).filter((r) => r.section === "penormalan");
 
-        if (pembebasanRows.length) {
-          pembebasanRows.forEach((row) => createRow("pembebasan", row));
-        } else {
-          createRow("pembebasan");
-        }
+        if (pembebasanRows.length) pembebasanRows.forEach((row) => createRow("pembebasan", row));
+        else createRow("pembebasan");
 
-        if (penormalanRows.length) {
-          penormalanRows.forEach((row) => createRow("penormalan", row));
-        } else {
-          createRow("penormalan");
-        }
+        if (penormalanRows.length) penormalanRows.forEach((row) => createRow("penormalan", row));
+        else createRow("penormalan");
+
+        document.getElementById("tahapPenormalanToggle").checked = false;
+        updateStageUI();
+        active = { ...EMPTY_ACTIVE };
+        saveFormState();
       } catch (e) {
         console.error("Gagal memuat template:", e);
         Swal.fire({
@@ -1010,5 +1215,6 @@ function createRow(section, data) {
     }
 
     generateText();
+    refreshSaveStatus();
   })();
 })();

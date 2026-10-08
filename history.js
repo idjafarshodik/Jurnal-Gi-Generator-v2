@@ -12,9 +12,88 @@
 
   let currentEntries = [];
   const giNameToId = {};
+  const ACTIVE_KEY = "jurnalGiActive_v1";
+
+  function escapeHtml(str) {
+    return String(str ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function toast(icon, title, text, timer = 1600) {
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon,
+      title,
+      text,
+      showConfirmButton: false,
+      timer,
+      timerProgressBar: true,
+    });
+  }
+
+  function getGeneratorState() {
+    try {
+      return JSON.parse(localStorage.getItem(ACTIVE_KEY) || "null");
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function confirmReplaceDraft() {
+    const st = getGeneratorState();
+    if (!st || !st.dirty) return true;
+
+    const res = await Swal.fire({
+      icon: "warning",
+      title: "Form generator belum disimpan",
+      text:
+        (st.id != null
+          ? `Jurnal #${st.id} di generator punya perubahan yang belum disimpan.`
+          : "Ada jurnal baru di generator yang belum disimpan.") +
+        " Kalau lanjut, isian itu akan diganti.",
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonText: "Buka generator",
+      denyButtonText: "Tetap lanjut",
+      cancelButtonText: "Batal",
+    });
+
+    if (res.isConfirmed) {
+      window.location.href = "index.html";
+      return false;
+    }
+    return res.isDenied;
+  }
+
+  async function goToGenerator(query) {
+    if (!(await confirmReplaceDraft())) return;
+    const st = getGeneratorState();
+    if (st) {
+      try {
+        localStorage.setItem(ACTIVE_KEY, JSON.stringify({ ...st, dirty: false }));
+      } catch (e) {}
+    }
+    window.location.href = `index.html?${query}`;
+  }
+
+  async function copyText(text) {
+    if (!text || !text.trim()) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("success", "Tersalin ke clipboard", "", 1400);
+    } catch (e) {
+      toast("error", "Gagal menyalin, coba manual", "", 1800);
+    }
+  }
 
   function applyTheme(theme) {
     document.body.setAttribute("data-theme", theme);
+    if (!themeIcon) return;
     if (theme === "dark") {
       themeIcon.textContent = "☀️";
       if (themeHint) themeHint.textContent = "Mode gelap aktif";
@@ -377,7 +456,7 @@
     }
 
     if (!currentTemplates.length) {
-      templatesContainer.innerHTML = `<div class="col-12 text-muted">Belum ada template. Klik "+ Buat Template Baru" untuk mulai.</div>`;
+      templatesContainer.innerHTML = `<div class="col-12 text-muted">Belum ada template. Klik "+ Baru" untuk mulai.</div>`;
       return;
     }
 
@@ -394,9 +473,9 @@
       item.innerHTML = `
         <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
           <div class="me-sm-3">
-            <div class="fw-semibold">${tpl.nama_template}</div>
+            <div class="fw-semibold">${escapeHtml(tpl.nama_template)}</div>
             <div class="small text-muted">
-              ${pCount} pembebasan • ${nCount} penormalan${tpl.dibuat_oleh ? ` • oleh ${tpl.dibuat_oleh}` : ""}
+              ${pCount} pembebasan • ${nCount} penormalan${tpl.dibuat_oleh ? ` • oleh ${escapeHtml(tpl.dibuat_oleh)}` : ""}
             </div>
           </div>
           <div class="d-flex gap-2">
@@ -427,17 +506,25 @@
     }
   }
 
-  async function fetchHistory(filterGiName) {
+  function getStatusFilter() {
+    const checked = document.querySelector('input[name="statusFilter"]:checked');
+    return checked ? checked.value : "";
+  }
+
+  async function fetchHistory(filterGiName, statusFilter) {
     const sb = window.JurnalAuth.supabaseClient;
     let query = sb
       .from("jurnal_manuver")
       .select(
-        "id, tanggal, hari, keterangan, dispatcher, pengawas_manuver, pengawas_pekerjaan, pengawas_k3, pelaksana_manuver, pesan_penutup, teks_final, dibuat_oleh, created_at, gi(nama), jurnal_manuver_rows(id, section, urutan, waktu, peralatan, bay, status)"
+        "id, tanggal, hari, keterangan, teks_final, dibuat_oleh, diubah_oleh, tahap_penormalan, created_at, updated_at, gi(nama)"
       )
-      .order("created_at", { ascending: false });
+      .order("updated_at", { ascending: false });
 
     if (filterGiName && giNameToId[filterGiName]) {
       query = query.eq("gi_id", giNameToId[filterGiName]);
+    }
+    if (statusFilter) {
+      query = query.eq("tahap_penormalan", statusFilter === "lengkap");
     }
 
     const { data, error } = await query;
@@ -453,82 +540,100 @@
       "Januari", "Februari", "Maret", "April", "Mei", "Juni",
       "Juli", "Agustus", "September", "Oktober", "November", "Desember",
     ];
-    const tgl = d.getDate();
-    const bln = months[d.getMonth()];
-    const thn = d.getFullYear();
-    return `${tgl} ${bln} ${thn}`;
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  function formatSavedAt(iso) {
+    if (!iso) return "";
+    const d = new Date(String(iso).replace(/(\.\d{3})\d+/, "$1"));
+    if (isNaN(d.getTime())) return "";
+    const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    if (d.toDateString() === new Date().toDateString()) return `hari ini ${hhmm}`;
+    const bln = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"][d.getMonth()];
+    return `${d.getDate()} ${bln} ${hhmm}`;
+  }
+
+  function buildMeta(h) {
+    const saved = formatSavedAt(h.updated_at || h.created_at);
+    const pembuat = h.dibuat_oleh || "-";
+    if (h.diubah_oleh && h.diubah_oleh !== h.dibuat_oleh) {
+      return `dibuat ${escapeHtml(pembuat)} · diubah ${escapeHtml(h.diubah_oleh)} ${saved}`;
+    }
+    return `oleh ${escapeHtml(pembuat)} · disimpan ${saved}`;
   }
 
   async function renderHistory() {
     if (!historyList) return;
 
-    historyList.innerHTML = `<div class="text-muted">Memuat riwayat...</div>`;
+    historyList.innerHTML = `<div class="history-empty">Memuat riwayat...</div>`;
 
     const filterGi = giFilter ? giFilter.value : "";
+    const statusFilter = getStatusFilter();
 
     try {
-      currentEntries = await fetchHistory(filterGi);
+      currentEntries = await fetchHistory(filterGi, statusFilter);
     } catch (e) {
       console.warn("Gagal memuat riwayat:", e);
-      historyList.innerHTML = `<div class="text-danger small">Gagal memuat riwayat. Cek koneksi internet lalu coba lagi.</div>`;
+      historyList.innerHTML = `<div class="history-empty text-danger">Gagal memuat riwayat. Cek koneksi internet lalu coba lagi.</div>`;
       return;
     }
-
-    historyList.innerHTML = "";
 
     if (!currentEntries.length) {
-      const msg = document.createElement("div");
-      msg.className = "text-muted";
-      msg.textContent = "Belum ada riwayat jurnal.";
-      historyList.appendChild(msg);
+      const filtered = filterGi || statusFilter;
+      historyList.innerHTML = `<div class="history-empty">${filtered ? "Tidak ada jurnal yang cocok dengan filter." : "Belum ada riwayat jurnal."}</div>`;
       return;
     }
 
-    currentEntries.forEach((h) => {
-      const item = document.createElement("div");
-      item.className = "list-group-item mb-2 rounded-3";
+    historyList.innerHTML = currentEntries
+      .map((h) => {
+        const lengkap = !!h.tahap_penormalan;
+        const giLabel = h.gi?.nama ? `GI ${escapeHtml(h.gi.nama)}` : "GI -";
+        const tanggal = h.tanggal ? formatTanggalIndo(h.tanggal) : "";
+        const dateLine = [h.hari, tanggal].filter(Boolean).join(", ");
+        const desc = (h.keterangan || "").trim();
 
-      const giLabel = h.gi?.nama || "-";
-      const tglLabel = h.tanggal ? formatTanggalIndo(h.tanggal) : (h.hari || "");
-      const snippet = (h.teks_final || "").split("\n").slice(0, 5).join("\n");
-      const olehLabel = h.dibuat_oleh ? ` • oleh ${h.dibuat_oleh}` : "";
-
-      item.innerHTML = `
-          <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-1">
-            <div>
-              <span class="badge badge-soft me-1">${giLabel}</span>
-              <span class="small text-muted">${tglLabel}${olehLabel}</span>
+        return `
+          <article class="history-card ${lengkap ? "is-done" : "is-open"}">
+            <div class="history-card-top">
+              <span class="history-gi">${giLabel}</span>
+              <span class="stage-badge ${lengkap ? "stage-done" : "stage-open"}">${lengkap ? "Lengkap" : "Pembebasan"}</span>
             </div>
-            <div class="d-flex gap-1">
-              <button type="button" class="btn btn-sm btn-outline-accent btn-view-history" data-id="${h.id}">
-                Lihat
-              </button>
-              <button type="button" class="btn btn-sm btn-outline-secondary btn-use-history" data-id="${h.id}">
-                Gunakan
-              </button>
-              <button type="button" class="btn btn-sm btn-outline-danger btn-delete-history" data-id="${h.id}">
-                Hapus
-              </button>
+            <div class="history-date">${escapeHtml(dateLine)} · #${h.id}</div>
+            <div class="history-desc ${desc ? "" : "is-empty"}">${desc ? escapeHtml(desc) : "Tanpa uraian pekerjaan"}</div>
+            <div class="history-meta">${buildMeta(h)}</div>
+            <div class="history-actions">
+              <button type="button" class="btn btn-sm btn-accent btn-continue-history" data-id="${h.id}">Lanjutkan</button>
+              <div class="dropdown">
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-more" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aksi lain">⋯</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><button type="button" class="dropdown-item btn-view-history" data-id="${h.id}">Lihat teks</button></li>
+                  <li><button type="button" class="dropdown-item btn-copy-history" data-id="${h.id}">Salin teks</button></li>
+                  <li><button type="button" class="dropdown-item btn-base-history" data-id="${h.id}">Jadikan dasar jurnal baru</button></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><button type="button" class="dropdown-item text-danger btn-delete-history" data-id="${h.id}">Hapus</button></li>
+                </ul>
+              </div>
             </div>
-          </div>
-          <pre class="small mb-0" style="max-height: 8rem; overflow:auto; white-space: pre-wrap;">${snippet}</pre>
-        `;
+          </article>`;
+      })
+      .join("");
+  }
 
-      historyList.appendChild(item);
-    });
+  function findEntry(id) {
+    return currentEntries.find((h) => String(h.id) === String(id));
   }
 
   document.addEventListener("click", async (e) => {
-    const target = e.target;
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    const id = btn.dataset.id;
 
-    if (target.classList.contains("btn-use-template")) {
-      const id = target.dataset.id;
-      window.location.href = `index.html?useTemplateId=${encodeURIComponent(id)}`;
+    if (btn.classList.contains("btn-use-template")) {
+      goToGenerator(`useTemplateId=${encodeURIComponent(id)}`);
       return;
     }
 
-    if (target.classList.contains("btn-delete-template")) {
-      const id = target.dataset.id;
+    if (btn.classList.contains("btn-delete-template")) {
       Swal.fire({
         title: "Hapus template ini?",
         text: "Template ini akan terhapus permanen dari database. Butuh password admin.",
@@ -545,62 +650,57 @@
         });
 
         if (result.cancelled) return;
-
         if (result.error) {
-          Swal.fire({
-            toast: true,
-            position: "top-end",
-            icon: "error",
-            title: result.error,
-            showConfirmButton: false,
-            timer: 2000,
-            timerProgressBar: true
-          });
+          toast("error", result.error, "", 2000);
           return;
         }
 
         await renderTemplateList();
-        Swal.fire({
-          toast: true,
-          position: "top-end",
-          icon: "success",
-          title: "Template dihapus",
-          showConfirmButton: false,
-          timer: 1200,
-          timerProgressBar: true
-        });
+        toast("success", "Template dihapus", "", 1200);
       });
       return;
     }
 
-    if (target.classList.contains("btn-view-history")) {
-      const id = target.dataset.id;
-      const entry = currentEntries.find((h) => String(h.id) === String(id));
+    if (btn.classList.contains("btn-continue-history")) {
+      goToGenerator(`lanjutkan=${encodeURIComponent(id)}`);
+      return;
+    }
+
+    if (btn.classList.contains("btn-base-history")) {
+      goToGenerator(`useHistory=${encodeURIComponent(id)}`);
+      return;
+    }
+
+    if (btn.classList.contains("btn-copy-history")) {
+      const entry = findEntry(id);
+      if (entry) copyText(entry.teks_final || "");
+      return;
+    }
+
+    if (btn.classList.contains("btn-view-history")) {
+      const entry = findEntry(id);
       if (!entry) return;
 
       const titleEl = document.getElementById("historyPreviewTitle");
       const textEl = document.getElementById("historyPreviewText");
-      titleEl.textContent = (entry.gi?.nama || "Detail Jurnal") + (entry.tanggal ? ` - ${formatTanggalIndo(entry.tanggal)}` : "");
+      const continueBtn = document.getElementById("historyPreviewContinueBtn");
+      titleEl.textContent = `#${entry.id} · ` + (entry.gi?.nama ? `GI ${entry.gi.nama}` : "Detail Jurnal") + (entry.tanggal ? ` · ${formatTanggalIndo(entry.tanggal)}` : "");
       textEl.textContent = entry.teks_final || "";
+      if (continueBtn) continueBtn.dataset.id = entry.id;
 
-      const modalEl = document.getElementById("historyPreviewModal");
-      const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
-      bsModal.show();
-
+      bootstrap.Modal.getOrCreateInstance(document.getElementById("historyPreviewModal")).show();
       return;
     }
 
-    if (target.classList.contains("btn-use-history")) {
-      const id = target.dataset.id;
-      window.location.href = `index.html?useHistory=${encodeURIComponent(id)}`;
+    if (btn.id === "historyPreviewContinueBtn" && id) {
+      goToGenerator(`lanjutkan=${encodeURIComponent(id)}`);
       return;
     }
 
-    if (target.classList.contains("btn-delete-history")) {
-      const id = target.dataset.id;
+    if (btn.classList.contains("btn-delete-history")) {
       Swal.fire({
-        title: "Hapus jurnal ini?",
-        text: "Jurnal ini akan terhapus permanen.",
+        title: `Hapus jurnal #${id}?`,
+        text: "Jurnal ini akan terhapus permanen. Butuh password admin.",
         icon: "warning",
         showCancelButton: true,
         confirmButtonText: "Lanjut",
@@ -614,30 +714,13 @@
         });
 
         if (result.cancelled) return;
-
         if (result.error) {
-          Swal.fire({
-            toast: true,
-            position: "top-end",
-            icon: "error",
-            title: result.error,
-            showConfirmButton: false,
-            timer: 2000,
-            timerProgressBar: true
-          });
+          toast("error", result.error, "", 2000);
           return;
         }
 
         await renderHistory();
-        Swal.fire({
-          toast: true,
-          position: "top-end",
-          icon: "success",
-          title: "Riwayat dihapus",
-          showConfirmButton: false,
-          timer: 1200,
-          timerProgressBar: true
-        });
+        toast("success", "Jurnal dihapus", "", 1200);
       });
       return;
     }
@@ -646,21 +729,14 @@
   if (clearHistoryBtn) {
     clearHistoryBtn.addEventListener("click", () => {
       if (!currentEntries.length) {
-        Swal.fire({
-          toast: true,
-          position: "top-end",
-          icon: "info",
-          title: "Riwayat sudah kosong",
-          showConfirmButton: false,
-          timer: 1400,
-          timerProgressBar: true
-        });
+        toast("info", "Tidak ada riwayat yang tampil", "", 1400);
         return;
       }
 
       const filterGi = giFilter ? giFilter.value : "";
-      const scopeText = filterGi
-        ? `Semua riwayat GI ${filterGi} (${currentEntries.length} jurnal) akan terhapus permanen dari database, untuk semua orang yang pakai aplikasi ini.`
+      const filtered = filterGi || getStatusFilter();
+      const scopeText = filtered
+        ? `${currentEntries.length} jurnal yang tampil sesuai filter sekarang akan terhapus permanen dari database, untuk semua orang yang pakai aplikasi ini.`
         : `SEMUA riwayat dari SEMUA GI (${currentEntries.length} jurnal) akan terhapus permanen dari database, untuk semua orang yang pakai aplikasi ini. Ini tidak bisa dibatalkan.`;
 
       Swal.fire({
@@ -718,34 +794,14 @@
     themeToggle.addEventListener("click", toggleTheme);
   }
 
+  document.querySelectorAll('input[name="statusFilter"]').forEach((el) => {
+    el.addEventListener("change", renderHistory);
+  });
+
   const historyPreviewCopyBtn = document.getElementById("historyPreviewCopyBtn");
   if (historyPreviewCopyBtn) {
-    historyPreviewCopyBtn.addEventListener("click", async () => {
-      const text = document.getElementById("historyPreviewText").textContent || "";
-      if (!text.trim()) return;
-
-      try {
-        await navigator.clipboard.writeText(text);
-        Swal.fire({
-          toast: true,
-          position: "top-end",
-          icon: "success",
-          title: "Tersalin ke clipboard",
-          showConfirmButton: false,
-          timer: 1400,
-          timerProgressBar: true
-        });
-      } catch (e) {
-        Swal.fire({
-          toast: true,
-          position: "top-end",
-          icon: "error",
-          title: "Gagal menyalin, coba manual",
-          showConfirmButton: false,
-          timer: 1800,
-          timerProgressBar: true
-        });
-      }
+    historyPreviewCopyBtn.addEventListener("click", () => {
+      copyText(document.getElementById("historyPreviewText").textContent || "");
     });
   }
 
