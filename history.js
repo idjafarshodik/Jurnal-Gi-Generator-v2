@@ -93,6 +93,7 @@
 
   function applyTheme(theme) {
     document.body.setAttribute("data-theme", theme);
+    document.documentElement.setAttribute("data-bs-theme", theme);
     if (!themeIcon) return;
     if (theme === "dark") {
       themeIcon.textContent = "☀️";

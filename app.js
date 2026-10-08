@@ -48,6 +48,7 @@
 
   function applyTheme(theme) {
     document.body.setAttribute("data-theme", theme);
+    document.documentElement.setAttribute("data-bs-theme", theme);
     if (!themeIcon) return;
     if (theme === "dark") {
       themeIcon.textContent = "☀️";
@@ -1137,11 +1138,44 @@ function createRow(section, data) {
   if (themeToggleBtn) themeToggleBtn.addEventListener("click", toggleTheme);
 
   window.addEventListener("beforeunload", (e) => {
-    if (isSaving || isDirty()) {
+    if (isSaving) {
       e.preventDefault();
       e.returnValue = "";
     }
   });
+
+  const historyLink = document.getElementById("historyLink");
+  if (historyLink) {
+    historyLink.addEventListener("click", async (e) => {
+      if (!isDirty()) return;
+      e.preventDefault();
+
+      const res = await Swal.fire({
+        icon: "question",
+        title: "Simpan dulu sebelum pindah?",
+        text:
+          (active.id != null
+            ? `Perubahan di Jurnal #${active.id} belum tersimpan ke riwayat.`
+            : "Jurnal ini belum tersimpan ke riwayat, jadi belum bisa dilanjutkan dari device lain.") +
+          " Isian tetap aman di device ini.",
+        showDenyButton: true,
+        showCancelButton: true,
+        confirmButtonText: "Simpan & buka riwayat",
+        denyButtonText: "Buka tanpa simpan",
+        cancelButtonText: "Batal",
+      });
+
+      if (res.isDismissed) return;
+      if (res.isConfirmed) {
+        const r = await saveJurnal();
+        if (!r.ok) {
+          if (r.reason === "error") toast("error", "Gagal menyimpan", "Cek koneksi internet, lalu coba lagi.", 2400);
+          return;
+        }
+      }
+      window.location.href = historyLink.href;
+    });
+  }
 
   window.addEventListener("storage", (e) => {
     if (e.key === ACTIVE_KEY) active = loadActive();
