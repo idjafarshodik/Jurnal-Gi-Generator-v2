@@ -76,7 +76,7 @@ async function jurnalCheckSession() {
     return;
   }
   if (jurnalIsInactiveExpired()) {
-    await supabaseClient.auth.signOut();
+    await supabaseClient.auth.signOut({ scope: "local" });
     jurnalShowAuthGate();
     return;
   }
@@ -125,7 +125,7 @@ async function jurnalRunAsAdmin(actionFn) {
   } catch (e) {
     return { error: e.message || "Gagal menjalankan aksi admin." };
   } finally {
-    await adminClient.auth.signOut();
+    await adminClient.auth.signOut({ scope: "local" });
   }
 }
 
@@ -135,7 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const logoutBtn = document.getElementById("authLogoutBtn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
-      await supabaseClient.auth.signOut();
+      await supabaseClient.auth.signOut({ scope: "local" });
       jurnalShowAuthGate();
     });
   }
@@ -204,7 +204,7 @@ window.JurnalAuth = {
   markActivity: jurnalMarkActivity,
   runAsAdmin: jurnalRunAsAdmin,
   logout: async () => {
-    await supabaseClient.auth.signOut();
+    await supabaseClient.auth.signOut({ scope: "local" });
     jurnalShowAuthGate();
   },
 };
