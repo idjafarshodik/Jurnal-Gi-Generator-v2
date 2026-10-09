@@ -64,12 +64,25 @@
     const bays = [];
     const map = new Map();
     rows.forEach((r) => {
-      const bay = (r.bay || "").trim();
-      if (!map.has(bay)) {
-        map.set(bay, { name: bay, items: new Map() });
-        bays.push(bay);
+      const name = JG.normEquipment(r.bay);
+      const key = JG.bayKey(name);
+      if (!map.has(key)) {
+        map.set(key, { name, items: new Map() });
+        bays.push(key);
       }
-      map.get(bay).items.set(r.peralatan, { peralatan: r.peralatan, status: r.status, type: JG.eqType(r.peralatan), state: JG.stateOf(r.status) });
+      const eq = JG.normEquipment(r.peralatan);
+      const draw = /^draw\s/i.test(r.status || "");
+      const type = JG.eqType(eq);
+      const items = map.get(key).items;
+      const base = type === "other" || type === "pms" ? eq : type;
+      const itemKey = draw ? `${base}|draw` : base;
+      items.delete(itemKey);
+      items.set(itemKey, {
+        peralatan: eq,
+        status: r.status,
+        type: draw && type === "inc" ? "incDraw" : type,
+        state: JG.stateOf(r.status),
+      });
     });
     return bays.map((b) => map.get(b));
   }
@@ -120,44 +133,99 @@
     return state === "open" ? "lepas" : state === "closed" ? "masuk" : "tidak dimanuver";
   }
 
-  function lineBaySvg(bay) {
-    const t = typeStates(bay);
-    const y = 40;
-    const parts = [];
+  function busPart(t, y, parts) {
     const both = "busA" in t && "busB" in t;
     const busName = "busA" in t ? "Bus A" : "busB" in t ? "Bus B" : "Bus";
     const busState = t.busA || t.busB;
-    let x0;
     if (both) {
       parts.push(`<rect x="8" y="8" width="6" height="24" rx="2" fill="var(--bus)"/>`, `<rect x="8" y="48" width="6" height="24" rx="2" fill="var(--bus)"/>`);
       parts.push(txt(20, 12, "A", "start", 'class="mm-t mm-bus"'), txt(20, 84, "B", "start", 'class="mm-t mm-bus"'));
       parts.push(`<path d="M14 20H36M64 20H96M14 60H36M64 60H96M96 20V60M96 ${y}H126" stroke="${WIRE}" stroke-width="2.4" fill="none"/>`);
       parts.push(hDisc(50, 20, t.busA), hDisc(50, 60, t.busB));
-      x0 = 96;
     } else {
       parts.push(`<rect x="8" y="16" width="6" height="48" rx="2" fill="var(--bus)"/>`, txt(4, 80, busName, "start"));
       parts.push(`<path d="M14 ${y}H36M64 ${y}H126" stroke="${WIRE}" stroke-width="2.4"/>`);
       parts.push(hDisc(50, y, busState), txt(50, 64, "PMS bus"));
-      x0 = 14;
     }
+    return both ? `PMS bus A ${stateWord(t.busA)}, PMS bus B ${stateWord(t.busB)}` : `PMS bus ${stateWord(busState)}`;
+  }
+
+  function gndStub(gx, y, state, parts) {
+    const gc = COLOR[state] || COLOR.none;
+    const gBlade =
+      state === "closed"
+        ? `<path d="M${gx} ${y}v26" stroke="${gc}" stroke-width="3.2" stroke-linecap="round"/>`
+        : state === "open"
+        ? `<path d="M${gx} ${y + 26}L${gx + 13} ${y + 10}" stroke="${gc}" stroke-width="3.2" stroke-linecap="round"/>`
+        : `<path d="M${gx} ${y}v26" stroke="${gc}" stroke-width="2.2" stroke-dasharray="3 3"/>`;
+    parts.push(gBlade, `<circle cx="${gx}" cy="${y + 26}" r="2.6" fill="${gc}"/>`);
+    parts.push(`<path d="M${gx - 9} ${y + 31}h18M${gx - 5} ${y + 35}h10M${gx - 2} ${y + 39}h4" stroke="${gc}" stroke-width="2" stroke-linecap="round"/>`);
+  }
+
+  function drawWord(state) {
+    return state === "open" ? "draw out" : state === "closed" ? "draw in" : "posisi troli tidak dimanuver";
+  }
+
+  function trafoBaySvg(bay) {
+    const t = typeStates(bay);
+    const y = 40;
+    const parts = [];
+    const busLabel = busPart(t, y, parts);
+    parts.push(box(139, y, 26, t.pmt), txt(139, 14, "PMT 150kV"));
+    parts.push(`<path d="M152 ${y}H181" stroke="${WIRE}" stroke-width="2.4"/>`);
+    if ("gnd" in t) {
+      gndStub(166, y, t.gnd, parts);
+      parts.push(txt(178, y + 36, "Ground", "start"));
+    }
+    parts.push(
+      `<circle cx="194" cy="${y}" r="13" fill="none" stroke="var(--ink)" stroke-width="2.4"/>`,
+      `<circle cx="212" cy="${y}" r="13" fill="none" stroke="var(--ink)" stroke-width="2.4"/>`,
+      txt(203, 14, "Trafo")
+    );
+    const out = t.incDraw === "open";
+    const dc = COLOR[t.incDraw] || COLOR.none;
+    const cx = 268;
+    const cy = out ? y + 18 : y;
+    parts.push(`<path d="M225 ${y}H${out ? 247 : 255}M${out ? 289 : 281} ${y}H318" stroke="${WIRE}" stroke-width="2.4"/>`);
+    parts.push(`<path d="M318 ${y - 7}l9 7-9 7" fill="none" stroke="${WIRE}" stroke-width="2.4" stroke-linejoin="round"/>`);
+    if (out) {
+      parts.push(`<path d="M247 ${y - 5}v10M289 ${y - 5}v10" stroke="${dc}" stroke-width="3" stroke-linecap="round"/>`);
+      parts.push(`<path d="M${cx - 13} ${cy}h-6M${cx + 13} ${cy}h6" stroke="${dc}" stroke-width="2.4" stroke-linecap="round"/>`);
+    } else if (t.incDraw === "closed") {
+      parts.push(`<path d="M253 ${y - 5}v10M283 ${y - 5}v10" stroke="${dc}" stroke-width="3" stroke-linecap="round"/>`);
+    }
+    parts.push(box(cx, cy, 26, t.inc), txt(cx, 14, "PMT 20kV"));
+    if (t.incDraw) parts.push(txt(cx, out ? cy + 28 : y + 30, out ? "Draw Out" : "Draw In"));
+    parts.push(txt(326, y + 24, "20kV", "end"));
+
+    const label = [
+      busLabel,
+      `PMT 150kV ${stateWord(t.pmt)}`,
+      "gnd" in t ? `PMS ground ${stateWord(t.gnd)}` : "",
+      `PMT 20kV ${stateWord(t.inc)}`,
+      t.incDraw ? drawWord(t.incDraw) : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+    return `<svg class="mimic" viewBox="0 0 340 ${out ? 96 : 92}" role="img" aria-label="Posisi akhir: ${JG.esc(label)}">${parts.join("")}</svg>`;
+  }
+
+  function lineBaySvg(bay) {
+    const t = typeStates(bay);
+    const y = 40;
+    const parts = [];
+    const both = "busA" in t && "busB" in t;
+    const busLabel = busPart(t, y, parts);
     parts.push(box(139, y, 26, t.pmt), txt(139, 70, "PMT"));
     parts.push(`<path d="M152 ${y}H190M218 ${y}H318" stroke="${WIRE}" stroke-width="2.4"/>`);
     parts.push(`<path d="M318 ${y - 7}l9 7-9 7" fill="none" stroke="${WIRE}" stroke-width="2.4" stroke-linejoin="round"/>`);
     parts.push(hDisc(204, y, t.line), txt(204, 64, "PMS line"));
     const gx = 266;
-    const gc = COLOR[t.gnd] || COLOR.none;
-    const gBlade =
-      t.gnd === "closed"
-        ? `<path d="M${gx} ${y}v26" stroke="${gc}" stroke-width="3.2" stroke-linecap="round"/>`
-        : t.gnd === "open"
-        ? `<path d="M${gx} ${y + 26}L${gx + 13} ${y + 10}" stroke="${gc}" stroke-width="3.2" stroke-linecap="round"/>`
-        : `<path d="M${gx} ${y}v26" stroke="${gc}" stroke-width="2.2" stroke-dasharray="3 3"/>`;
-    parts.push(gBlade, `<circle cx="${gx}" cy="${y + 26}" r="2.6" fill="${gc}"/>`);
-    parts.push(`<path d="M${gx - 9} ${y + 31}h18M${gx - 5} ${y + 35}h10M${gx - 2} ${y + 39}h4" stroke="${gc}" stroke-width="2" stroke-linecap="round"/>`);
+    gndStub(gx, y, t.gnd, parts);
     parts.push(txt(gx + 16, y + 36, "Ground", "start"));
 
     const label = [
-      both ? `PMS bus A ${stateWord(t.busA)}, PMS bus B ${stateWord(t.busB)}` : `PMS bus ${stateWord(busState)}`,
+      busLabel,
       `PMT ${stateWord(t.pmt)}`,
       `PMS line ${stateWord(t.line)}`,
       `PMS ground ${stateWord(t.gnd)}`,
@@ -218,8 +286,7 @@
             }
             shown++;
             const cls = it.state === "open" ? "lamp-open" : it.state === "closed" ? "lamp-closed" : "lamp-none";
-            const word = it.state === "open" ? "lepas" : it.state === "closed" ? "masuk" : (it.status || "").replace(/[()]/g, "").toLowerCase() || "?";
-            return `<li><span class="lamp ${cls}"></span><span class="lamp-eq">${JG.esc(it.peralatan)}</span><span class="lamp-st">${JG.esc(word)}</span></li>`;
+            return `<li><span class="lamp ${cls}"></span><span class="lamp-eq">${JG.esc(it.peralatan)}</span>${JG.statusPill(it.status)}</li>`;
           })
           .join("");
         if (!lis) return "";
@@ -235,12 +302,16 @@
     const bays = finalStates(rows);
     const unknown = rows.some((r) => {
       const ty = JG.eqType(r.peralatan);
-      return !r.bay || ty === "other" || ty === "inc" || ty === "pms" || JG.stateOf(r.status) === "unknown";
+      return !r.bay || ty === "other" || ty === "pms" || JG.stateOf(r.status) === "unknown";
     });
     if (unknown) return "lamps";
     const lineTypes = new Set(["busA", "busB", "pmt", "line", "gnd"]);
+    const trafoTypes = new Set(["busA", "busB", "pmt", "inc", "incDraw", "gnd"]);
     if (bays.length === 1 && !JG.isKopel(bays[0].name)) {
-      return [...bays[0].items.values()].every((it) => lineTypes.has(it.type)) ? "line" : "lamps";
+      const items = [...bays[0].items.values()];
+      const trafo = JG.isTrafoBay(bays[0].name) || items.some((it) => it.type === "inc" || it.type === "incDraw");
+      if (trafo) return items.every((it) => trafoTypes.has(it.type)) ? "trafo" : "lamps";
+      return items.every((it) => lineTypes.has(it.type)) ? "line" : "lamps";
     }
     if (bays.length <= 7) {
       const ok = bays.every((b) =>
@@ -256,6 +327,7 @@
     if (kind === "none") return "";
     const bays = finalStates(rows);
     if (kind === "line") return lineBaySvg(bays[0]);
+    if (kind === "trafo") return trafoBaySvg(bays[0]);
     if (kind === "busbar") return busbarSvg(bays);
     return lampsHtml(bays);
   };

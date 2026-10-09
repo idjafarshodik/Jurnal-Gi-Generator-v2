@@ -1,6 +1,6 @@
 (function () {
   const JG = (window.JG = window.JG || {});
-  const { normalizeSavedTime } = window.ManuverParser;
+  const { normalizeSavedTime, canonPeralatan } = window.ManuverParser;
 
   JG.THEME_KEY = "jurnalGiTheme_v1";
 
@@ -38,12 +38,26 @@
 
   JG.sb = () => window.JurnalAuth.supabaseClient;
   JG.normalizeTime = (v) => normalizeSavedTime(v || "");
+  JG.bayKey = (s) =>
+    String(s || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+  JG.sameBay = (a, b) => JG.bayKey(a) === JG.bayKey(b);
   JG.normEquipment = (s) =>
     String(s || "")
       .replace(/\s+/g, " ")
       .replace(/(\d+)\s*kv\b/gi, "$1KV")
       .trim()
       .toUpperCase();
+  JG.canonPeralatan = canonPeralatan;
+  JG.isTrafoBay = (bay) => /TRAFO|\bTRF\b|\bIBT\b|\bTR\s*\d/i.test(bay || "");
+  JG.isKopelBay = (bay) => /KOPEL|COUPLER/i.test(bay || "");
+  JG.has20kv = function (rows, bay) {
+    if (JG.isTrafoBay(bay)) return true;
+    return (rows || []).some(
+      (r) => JG.isTrafoBay(r.bay) || /\bINC\b|20KV/.test(JG.normEquipment(r.peralatan)) || /^draw\s*(in|out)$/i.test(r.status || "")
+    );
+  };
 
   JG.esc = function (str) {
     return String(str ?? "")
@@ -103,6 +117,20 @@
     return isNaN(d.getTime()) ? null : d;
   };
 
+  JG.formatTanggalPendek = function (dateStr) {
+    if (!dateStr) return "";
+    const d = new Date(dateStr + "T00:00:00");
+    if (isNaN(d.getTime())) return dateStr;
+    const hari = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"][d.getDay()];
+    const bln = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"][d.getMonth()];
+    return `${hari}, ${d.getDate()} ${bln}`;
+  };
+
+  JG.hariTanggal = function (dateStr) {
+    if (!dateStr) return "";
+    return `${JG.hariFromDate(dateStr)}, ${JG.formatTanggalIndo(dateStr)}`;
+  };
+
   JG.formatSavedAt = function (iso, withToday) {
     const d = JG.parseIso(iso);
     if (!d) return "";
@@ -140,8 +168,11 @@
     const namaGi = (d.namaGi || "").trim();
     lines.push(namaGi ? `*JURNAL GI ${namaGi.toUpperCase()}*` : "*JURNAL GI _______*");
 
-    const tanggalFormatted = JG.formatTanggalIndo(d.tanggal);
-    const lineHariTanggal = [d.hari, d.tanggal ? tanggalFormatted : ""].filter(Boolean).join(", ");
+    const showPenormalan = !!(d.penormalanRows.length && d.tahapPenormalan);
+    const tn = showPenormalan && d.tanggalPenormalan && d.tanggalPenormalan !== d.tanggal ? d.tanggalPenormalan : "";
+    const judulTanggal = tn || d.tanggal;
+    const hariJudul = judulTanggal ? JG.hariFromDate(judulTanggal) : d.hari;
+    const lineHariTanggal = [hariJudul, judulTanggal ? JG.formatTanggalIndo(judulTanggal) : ""].filter(Boolean).join(", ");
     if (lineHariTanggal) lines.push(lineHariTanggal);
 
     lines.push("");
@@ -162,19 +193,21 @@
     };
 
     if (d.pembebasanRows.length) {
-      lines.push("Pembebasan tegangan:");
+      lines.push(tn && d.tanggal ? `Pembebasan tegangan (${JG.hariTanggal(d.tanggal)}):` : "Pembebasan tegangan:");
       d.pembebasanRows.forEach((r) => lines.push(fmt(r)));
       lines.push("");
     }
 
-    if (d.penormalanRows.length && d.tahapPenormalan) {
-      lines.push("Penormalan tegangan:");
+    if (showPenormalan) {
+      lines.push(tn ? `Penormalan tegangan (${JG.hariTanggal(tn)}):` : "Penormalan tegangan:");
       d.penormalanRows.forEach((r) => lines.push(fmt(r)));
       lines.push("");
     }
 
     const people = [
       ["Dispatcher", d.dispatcher],
+      ["Dispatcher 20kV", d.dispatcher20kv],
+      ["Operator 20kV", d.operator20kv],
       ["Pengawas Manuver", d.pengawasManuver],
       ["Pengawas Pekerjaan", d.pengawasPekerjaan],
       ["Pengawas K3", d.pengawasK3],
@@ -255,34 +288,57 @@
     return JG.giCache;
   };
 
+  JG.schemaBaru = true;
+
+  function kolomBelumAda(error) {
+    const msg = `${error?.code || ""} ${error?.message || ""}`;
+    return /42703|PGRST204|tanggal_penormalan|dispatcher_20kv|operator_20kv/.test(msg);
+  }
+
+  async function withSchema(run) {
+    if (JG.schemaBaru) {
+      const r = await run(true);
+      if (!r.error) return r.data;
+      if (!kolomBelumAda(r.error)) throw r.error;
+      JG.schemaBaru = false;
+      console.warn("Kolom tanggal_penormalan / 20kV belum ada. Jalankan sql/migrasi-v3.2.sql.");
+    }
+    const r = await run(false);
+    if (r.error) throw r.error;
+    return r.data;
+  }
+
+  const ROWS_SEL = "jurnal_manuver_rows(section, urutan, waktu, peralatan, bay, status)";
+
   JG.api = {
     async listJurnal({ gi, status, search, limit } = {}) {
       await JG.loadGi();
-      let q = JG.sb()
-        .from("jurnal_manuver")
-        .select(
-          "id, tanggal, hari, keterangan, teks_final, dibuat_oleh, diubah_oleh, tahap_penormalan, created_at, updated_at, gi(nama), jurnal_manuver_rows(section, urutan, waktu, peralatan, bay, status)"
-        )
-        .order("updated_at", { ascending: false })
-        .limit(limit || 200);
-      if (gi && JG.giCache[gi]) q = q.eq("gi_id", JG.giCache[gi]);
-      if (status) q = q.eq("tahap_penormalan", status === "lengkap");
-      if (search) q = q.ilike("keterangan", `%${search}%`);
-      const { data, error } = await q;
-      if (error) throw error;
+      const data = await withSchema((baru) => {
+        let q = JG.sb()
+          .from("jurnal_manuver")
+          .select(
+            `id, tanggal, ${baru ? "tanggal_penormalan, " : ""}hari, keterangan, teks_final, dibuat_oleh, diubah_oleh, tahap_penormalan, created_at, updated_at, gi(nama), ${ROWS_SEL}`
+          )
+          .order("updated_at", { ascending: false })
+          .limit(limit || 200);
+        if (gi && JG.giCache[gi]) q = q.eq("gi_id", JG.giCache[gi]);
+        if (status) q = q.eq("tahap_penormalan", status === "lengkap");
+        if (search) q = q.ilike("keterangan", `%${search}%`);
+        return q;
+      });
       return data || [];
     },
 
     async getJurnal(id) {
-      const { data, error } = await JG.sb()
-        .from("jurnal_manuver")
-        .select(
-          "id, tanggal, hari, keterangan, dispatcher, pengawas_manuver, pengawas_pekerjaan, pengawas_k3, pelaksana_manuver, pesan_penutup, tahap_penormalan, updated_at, gi(nama), jurnal_manuver_rows(section, urutan, waktu, peralatan, bay, status)"
-        )
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-      return data;
+      return withSchema((baru) =>
+        JG.sb()
+          .from("jurnal_manuver")
+          .select(
+            `id, tanggal, ${baru ? "tanggal_penormalan, dispatcher_20kv, operator_20kv, " : ""}hari, keterangan, dispatcher, pengawas_manuver, pengawas_pekerjaan, pengawas_k3, pelaksana_manuver, pesan_penutup, tahap_penormalan, updated_at, gi(nama), ${ROWS_SEL}`
+          )
+          .eq("id", id)
+          .single()
+      );
     },
 
     async listTemplates() {
@@ -324,13 +380,16 @@
     },
 
     async nameSuggestions() {
-      const cols = ["dispatcher", "pengawas_manuver", "pengawas_pekerjaan", "pengawas_k3", "pelaksana_manuver"];
-      const { data, error } = await JG.sb()
-        .from("jurnal_manuver")
-        .select(cols.join(", "))
-        .order("updated_at", { ascending: false })
-        .limit(300);
-      if (error) throw error;
+      const base = ["dispatcher", "pengawas_manuver", "pengawas_pekerjaan", "pengawas_k3", "pelaksana_manuver"];
+      let cols = base;
+      const data = await withSchema((baru) => {
+        cols = baru ? [...base, "dispatcher_20kv", "operator_20kv"] : base;
+        return JG.sb()
+          .from("jurnal_manuver")
+          .select(cols.join(", "))
+          .order("updated_at", { ascending: false })
+          .limit(300);
+      });
       const out = {};
       cols.forEach((c) => {
         const seen = new Set();
@@ -349,15 +408,19 @@
 
   JG.inferBay = function (rows) {
     const count = {};
+    const label = {};
     rows.forEach((r) => {
-      const b = (r.bay || "").trim();
-      if (b) count[b] = (count[b] || 0) + 1;
+      const b = JG.normEquipment(r.bay);
+      const k = JG.bayKey(b);
+      if (!k) return;
+      count[k] = (count[k] || 0) + 1;
+      if (!label[k]) label[k] = b;
     });
     let best = "";
     let max = 0;
-    Object.entries(count).forEach(([b, n]) => {
+    Object.entries(count).forEach(([k, n]) => {
       if (n > max) {
-        best = b;
+        best = label[k];
         max = n;
       }
     });
@@ -370,8 +433,8 @@
       .sort((a, b) => a.urutan - b.urutan)
       .map((r) => ({
         waktu: withTime ? JG.normalizeTime(r.waktu) : "",
-        peralatan: r.peralatan === "PMT 20KV" ? "PMT INC 20KV" : r.peralatan || "",
-        bay: (r.bay || "").trim() === bay ? "" : (r.bay || "").trim(),
+        peralatan: JG.canonPeralatan(r.peralatan),
+        bay: JG.sameBay(r.bay, bay) ? "" : JG.normEquipment(r.bay),
         status: r.status || "",
       }));
   };
@@ -389,12 +452,73 @@
     return times.length === 1 ? times[0] : `${times[0]}–${times[times.length - 1]}`;
   };
 
-  JG.nextPeralatan = function (section, prev) {
-    if (!prev) return section === "pembebasan" ? JG.PERALATAN[0] : "";
-    const i = JG.PERALATAN.indexOf(prev.peralatan);
-    if (i < 0 || i > 4) return "";
-    const j = section === "pembebasan" ? i + 1 : i - 1;
-    return j >= 0 && j <= 4 ? JG.PERALATAN[j] : "";
+  const SOP = {
+    line: [
+      ["pmt", "#"],
+      ["bus", "#"],
+      ["line", "#"],
+      ["gnd", "//"],
+    ],
+    trafo: [
+      ["inc", "#"],
+      ["pmt", "#"],
+      ["bus", "#"],
+      ["inc", "Draw Out"],
+    ],
+    kopel: [
+      ["pmt", "#"],
+      ["busA", "#"],
+      ["busB", "#"],
+    ],
+  };
+
+  const SOP_NAME = {
+    pmt: "PMT 150KV",
+    inc: "PMT INC 20KV",
+    line: "PMS LINE 150KV",
+    gnd: "PMS GROUND 150KV",
+    busA: "PMS BUS A 150KV",
+    busB: "PMS BUS B 150KV",
+  };
+
+  JG.bayKind = function (bay, rows) {
+    if (JG.isKopelBay(bay)) return "kopel";
+    if (JG.isTrafoBay(bay)) return "trafo";
+    if ((rows || []).some((r) => JG.eqType(r.peralatan) === "inc")) return "trafo";
+    return "line";
+  };
+
+  JG.nextRow = function (section, rows, defaultBay, refRows) {
+    const prev = rows[rows.length - 1];
+    const dflt = section === "pembebasan" ? "#" : "//";
+    const fallback = { peralatan: "", status: prev && !/^draw/i.test(prev.status || "") ? prev.status : dflt };
+    const bay = (prev && prev.bay) || defaultBay || "";
+    const sameBayRows = rows.filter((r) => JG.sameBay(r.bay || defaultBay, bay));
+    const kind = JG.bayKind(bay, sameBayRows);
+    let steps = SOP[kind];
+    if (section === "penormalan") steps = steps.slice().reverse().map(([t, s]) => [t, JG.flipStatus(s)]);
+
+    const typeOf = (r) => {
+      const t = JG.eqType(r.peralatan);
+      return kind !== "kopel" && (t === "busA" || t === "busB") ? "bus" : t;
+    };
+    const busName = () => {
+      const all = [...rows, ...(refRows || [])];
+      const b = all.find((r) => /^bus[AB]$/.test(JG.eqType(r.peralatan)));
+      return b ? SOP_NAME[JG.eqType(b.peralatan)] : SOP_NAME.busA;
+    };
+    const name = (t) => (t === "bus" ? busName() : SOP_NAME[t]);
+
+    let idx = 0;
+    if (prev) {
+      const pt = typeOf(prev);
+      const hit = steps.findIndex(([t, s]) => t === pt && s === prev.status);
+      if (hit < 0) return fallback;
+      idx = hit + 1;
+    }
+    if (idx >= steps.length) return fallback;
+    const [t, s] = steps[idx];
+    return { peralatan: name(t), status: s };
   };
 
   JG.MINE_KEY = "jurnalGiMine_v1";
@@ -451,8 +575,8 @@
   JG.bayNames = function (rows) {
     const seen = [];
     rows.forEach((r) => {
-      const b = (r.bay || "").trim();
-      if (b && !seen.includes(b)) seen.push(b);
+      const b = JG.normEquipment(r.bay);
+      if (b && !seen.some((x) => JG.sameBay(x, b))) seen.push(b);
     });
     return seen;
   };
@@ -476,7 +600,7 @@
     listEl.innerHTML = rows
       .map((r, i) => {
         const t = JG.normalizeTime(r.waktu);
-        const ownBay = r.bay && r.bay !== bay;
+        const ownBay = r.bay && !JG.sameBay(r.bay, bay);
         const sub = ownBay
           ? `<small>Bay ${JG.esc(r.bay)}</small>`
           : !bay && !r.bay
@@ -540,7 +664,7 @@
         <span class="log-no">${h.id}</span>
         <div class="log-main">
           <div class="log-t1">${JG.esc(gi)}${bay ? `, ${JG.esc(bay.replace(/^Bay /, ""))}` : ""}</div>
-          <div class="log-t2">${lengkap ? "" : `<span class="log-flag">Belum dinormalkan</span> `}${JG.esc((h.keterangan || "").replace(/\*/g, "").trim() || "Tanpa uraian")}</div>
+          <div class="log-t2">${lengkap ? "" : `<span class="log-flag">Belum dinormalkan</span> `}${lengkap && h.tanggal_penormalan && h.tanggal_penormalan !== h.tanggal ? `<span class="log-tn">Normal ${JG.esc(JG.formatTanggalPendek(h.tanggal_penormalan))}.</span> ` : ""}${JG.esc((h.keterangan || "").replace(/\*/g, "").trim() || "Tanpa uraian")}</div>
         </div>
         <div class="log-tm">${end}<small>${JG.esc(who)}</small></div>
       </li>`;

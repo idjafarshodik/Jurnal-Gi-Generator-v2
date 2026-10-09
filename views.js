@@ -27,7 +27,9 @@
     detailEntry = h;
     const gi = h.gi?.nama ? JG.giLabel(h.gi.nama) : "GI belum dipilih";
     $("textModalTitle").textContent = `Jurnal #${h.id}`;
-    $("textModalSub").textContent = `${gi}${h.tanggal ? `, ${JG.hariFromDate(h.tanggal)} ${JG.formatTanggalIndo(h.tanggal)}` : ""}`;
+    const tn = h.tahap_penormalan && h.tanggal_penormalan && h.tanggal_penormalan !== h.tanggal ? h.tanggal_penormalan : "";
+    const tgl = h.tanggal ? `, ${JG.hariFromDate(h.tanggal)} ${JG.formatTanggalIndo(h.tanggal)}` : "";
+    $("textModalSub").textContent = `${gi}${tgl}${tn ? ` s.d. ${JG.hariFromDate(tn)} ${JG.formatTanggalIndo(tn)}` : ""}`;
     $("textModalBody").textContent = h.teks_final || "";
     $("textModalOpen").textContent = h.tahap_penormalan ? "Buka di editor" : "Normalkan";
     $("textModalJurnalActions").hidden = false;
@@ -256,12 +258,11 @@
     function cfg(section, index) {
       const rows = form[section];
       const isNew = index < 0;
-      const prev = isNew ? rows[rows.length - 1] : rows[index - 1];
       const label = section === "pembebasan" ? "Pembebasan" : "Penormalan";
       return {
         title: isNew ? `${label} #${rows.length + 1}` : `${label} #${index + 1}`,
         row: isNew
-          ? { peralatan: JG.nextPeralatan(section, rows[rows.length - 1]), bay: "", status: prev ? prev.status : section === "pembebasan" ? "#" : "//" }
+          ? { bay: "", ...JG.nextRow(section, rows, form.bay, section === "penormalan" ? form.pembebasan : form.penormalan) }
           : { ...rows[index] },
         isNew,
         withTime: false,
@@ -274,7 +275,7 @@
             form.bay = r.bay;
             $("tplBay").value = r.bay;
             r.bay = "";
-          } else if (r.bay === form.bay) r.bay = "";
+          } else if (JG.sameBay(r.bay, form.bay)) r.bay = "";
           if (isNew) rows.push(r);
           else rows[index] = r;
           renderForm();
@@ -287,7 +288,7 @@
         onMove(dir, current) {
           const j = index + dir;
           if (j < 0 || j >= rows.length) return null;
-          rows[index] = { ...current, bay: current.bay === form.bay ? "" : current.bay };
+          rows[index] = { ...current, bay: JG.sameBay(current.bay, form.bay) ? "" : current.bay };
           [rows[index], rows[j]] = [rows[j], rows[index]];
           renderForm();
           return cfg(section, j);

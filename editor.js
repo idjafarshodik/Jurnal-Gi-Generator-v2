@@ -14,9 +14,14 @@
     return {
       namaGi: "",
       tanggal: "",
+      tanggalPenormalan: "",
+      tnAuto: false,
       keterangan: "",
       bay: "",
+      show20kv: false,
       dispatcher: "",
+      dispatcher20kv: "",
+      operator20kv: "",
       pengawasManuver: "",
       pengawasPekerjaan: "",
       pengawasK3: "",
@@ -47,6 +52,8 @@
 
   const PEOPLE = [
     ["dispatcher", "fDispatcher", "dispatcher"],
+    ["dispatcher20kv", "fDispatcher20kv", "dispatcher_20kv"],
+    ["operator20kv", "fOperator20kv", "operator_20kv"],
     ["pengawasManuver", "fPengawasManuver", "pengawas_manuver"],
     ["pengawasPekerjaan", "fPengawasPekerjaan", "pengawas_pekerjaan"],
     ["pengawasK3", "fPengawasK3", "pengawas_k3"],
@@ -62,15 +69,24 @@
     }));
   }
 
+  function tnEffective() {
+    if (state.stage !== "penormalan") return "";
+    const tn = state.tanggalPenormalan || "";
+    return tn && tn !== state.tanggal ? tn : "";
+  }
+
   function collect() {
     const penormalan = state.stage === "penormalan";
     const pesan = (penormalan ? state.pesanPenormalan : state.pesanPembebasan).trim();
     return {
       namaGi: state.namaGi,
       tanggal: state.tanggal,
+      tanggalPenormalan: tnEffective(),
       hari: JG.hariFromDate(state.tanggal),
       keterangan: state.keterangan,
       dispatcher: state.dispatcher,
+      dispatcher20kv: state.dispatcher20kv,
+      operator20kv: state.operator20kv,
       pengawasManuver: state.pengawasManuver,
       pengawasPekerjaan: state.pengawasPekerjaan,
       pengawasK3: state.pengawasK3,
@@ -108,6 +124,66 @@
     renderPreview();
     renderStatus();
     renderSummaries();
+    render20kv();
+    renderTn();
+  }
+
+  function needs20kv() {
+    return (
+      state.show20kv ||
+      !!(state.dispatcher20kv || "").trim() ||
+      !!(state.operator20kv || "").trim() ||
+      JG.has20kv([...state.pembebasan, ...state.penormalan], state.bay)
+    );
+  }
+
+  function render20kv() {
+    const on = needs20kv();
+    $("trafoFields").hidden = !on;
+    $("add20kvWrap").hidden = on;
+  }
+
+  function addDays(iso, n) {
+    const d = new Date(iso + "T00:00:00");
+    d.setDate(d.getDate() + n);
+    return JG.isoDate(d);
+  }
+
+  function renderTn() {
+    const diff = !!tnEffective();
+    document.querySelectorAll("#tnSeg .tn-btn").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.tn === "diff") === diff)));
+    $("tnDateWrap").hidden = !diff;
+    if (document.activeElement !== $("fTanggalPenormalan")) $("fTanggalPenormalan").value = diff ? state.tanggalPenormalan : "";
+    $("tnHari").textContent = diff ? JG.hariFromDate(state.tanggalPenormalan) : "";
+    const note = $("tnNote");
+    if (diff && state.tanggal) {
+      note.hidden = false;
+      note.textContent = `${state.tnAuto ? "Diisi otomatis. " : ""}Pembebasan ${JG.formatTanggalPendek(state.tanggal)}, penormalan ${JG.formatTanggalPendek(state.tanggalPenormalan)}. Tanggal ditulis per bagian di teks WA.`;
+    } else {
+      note.hidden = true;
+    }
+    $("tglLabel").textContent = diff ? "Tanggal pembebasan" : "Tanggal";
+    $("hariLabel").hidden = diff;
+  }
+
+  function autoTanggalPenormalan() {
+    const today = JG.todayIso();
+    if (!state.tanggalPenormalan && state.tanggal && state.tanggal < today) {
+      state.tanggalPenormalan = today;
+      state.tnAuto = true;
+    }
+  }
+
+  function setTnMode(mode) {
+    if (mode === "same") {
+      state.tanggalPenormalan = "";
+    } else if (!tnEffective()) {
+      const today = JG.todayIso();
+      state.tanggalPenormalan = state.tanggal && today !== state.tanggal ? today : state.tanggal ? addDays(state.tanggal, 1) : today;
+    }
+    state.tnAuto = false;
+    onChange();
+    if (mode === "diff") $("fTanggalPenormalan").focus();
   }
 
   function renderStatus() {
@@ -195,6 +271,7 @@
   function renderFields() {
     $("fNamaGi").value = state.namaGi;
     $("fTanggal").value = state.tanggal;
+    $("fTanggalPenormalan").value = tnEffective() ? state.tanggalPenormalan : "";
     $("fKeterangan").value = state.keterangan;
     PEOPLE.forEach(([k, id]) => {
       $(id).value = state[k] || "";
@@ -206,6 +283,8 @@
     renderStage();
     renderLists();
     renderSummaries();
+    render20kv();
+    renderTn();
     renderPreview();
     renderStatus();
   }
@@ -222,9 +301,8 @@
     const row = isNew
       ? {
           waktu: "",
-          peralatan: JG.nextPeralatan(section, rows[rows.length - 1]),
           bay: "",
-          status: prev ? prev.status : section === "pembebasan" ? "#" : "//",
+          ...JG.nextRow(section, rows, state.bay, section === "penormalan" ? state.pembebasan : state.penormalan),
         }
       : { ...rows[index] };
 
@@ -241,7 +319,7 @@
         if (!state.bay && r.bay) {
           state.bay = r.bay;
           r.bay = "";
-        } else if (r.bay === state.bay) {
+        } else if (JG.sameBay(r.bay, state.bay)) {
           r.bay = "";
         }
         if (isNew) rows.push(r);
@@ -258,7 +336,7 @@
       onMove(dir, current) {
         const j = index + dir;
         if (j < 0 || j >= rows.length) return null;
-        rows[index] = { ...current, bay: current.bay === state.bay ? "" : current.bay };
+        rows[index] = { ...current, bay: JG.sameBay(current.bay, state.bay) ? "" : current.bay };
         [rows[index], rows[j]] = [rows[j], rows[index]];
         renderLists();
         onChange();
@@ -316,9 +394,12 @@
     const header = {
       gi_id: JG.giCache[data.namaGi] || null,
       tanggal: data.tanggal,
+      tanggal_penormalan: data.tanggalPenormalan || null,
       hari: data.hari,
       keterangan: data.keterangan,
       dispatcher: data.dispatcher,
+      dispatcher_20kv: data.dispatcher20kv,
+      operator_20kv: data.operator20kv,
       pengawas_manuver: data.pengawasManuver,
       pengawas_pekerjaan: data.pengawasPekerjaan,
       pengawas_k3: data.pengawasK3,
@@ -448,9 +529,12 @@
       ...newState(),
       namaGi: h.gi?.nama || "",
       tanggal: asBase ? JG.todayIso() : h.tanggal || "",
+      tanggalPenormalan: asBase ? "" : h.tanggal_penormalan || "",
       keterangan: h.keterangan || "",
       bay,
       dispatcher: h.dispatcher || "",
+      dispatcher20kv: h.dispatcher_20kv || "",
+      operator20kv: h.operator_20kv || "",
       pengawasManuver: h.pengawas_manuver || "",
       pengawasPekerjaan: h.pengawas_pekerjaan || "",
       pengawasK3: h.pengawas_k3 || "",
@@ -495,6 +579,7 @@
   function setStage(stage) {
     if (state.stage === stage) return;
     state.stage = stage;
+    if (stage === "penormalan") autoTanggalPenormalan();
     showPembebasanList = false;
     renderStage();
     renderLists();
@@ -534,7 +619,7 @@
     const nb = JG.normEquipment(value);
     [state.pembebasan, state.penormalan].forEach((rows) =>
       rows.forEach((r) => {
-        if (r.bay === nb) r.bay = "";
+        if (JG.sameBay(r.bay, nb)) r.bay = "";
       })
     );
     state.bay = nb;
@@ -600,6 +685,8 @@
       : `<span class="warn">Tidak ditemukan</span>`;
     const people = [
       ["Dispatcher", p.people.dispatcher],
+      ["Dispatcher 20kV", p.people.dispatcher20kv],
+      ["Operator 20kV", p.people.operator20kv],
       ["Pengawas manuver", p.people.pengawasManuver],
       ["Pengawas pekerjaan", p.people.pengawasPekerjaan],
       ["Pengawas K3", p.people.pengawasK3],
@@ -609,7 +696,8 @@
     $("importSummary").innerHTML = `
       <dl class="imp-sum">
         ${item("Gardu induk", giText)}
-        ${item("Tanggal", p.tanggal ? JG.esc(`${JG.hariFromDate(p.tanggal)}, ${JG.formatTanggalIndo(p.tanggal)}`) : '<span class="warn">Tidak ditemukan</span>')}
+        ${item(p.tanggalPenormalan ? "Tanggal pembebasan" : "Tanggal", p.tanggal ? JG.esc(JG.hariTanggal(p.tanggal)) : '<span class="warn">Tidak ditemukan</span>')}
+        ${p.tanggalPenormalan ? item("Tanggal penormalan", JG.esc(JG.hariTanggal(p.tanggalPenormalan))) : ""}
         ${item("Uraian", JG.esc(p.keterangan) || '<span class="muted">Kosong</span>')}
         ${item("Manuver", `${p.pembebasan.length} pembebasan, ${p.penormalan.length} penormalan`)}
         ${item("Pengawas", people.length ? people.map(([k, v]) => `${k}: ${JG.esc(v)}`).join("<br>") : '<span class="muted">Kosong</span>')}
@@ -628,8 +716,8 @@
       const b = JG.normEquipment(r.bay);
       return {
         waktu: JG.normalizeTime(r.waktu),
-        peralatan: JG.normEquipment(r.peralatan),
-        bay: b === bay ? "" : b,
+        peralatan: JG.canonPeralatan(r.peralatan),
+        bay: JG.sameBay(b, bay) ? "" : b,
         status: r.status || "",
       };
     });
@@ -646,9 +734,12 @@
         ...newState(),
         namaGi: p.namaGi || "",
         tanggal: p.tanggal || "",
+        tanggalPenormalan: p.tanggalPenormalan || "",
         keterangan: p.keterangan || "",
         bay,
         dispatcher: p.people.dispatcher || "",
+        dispatcher20kv: p.people.dispatcher20kv || "",
+        operator20kv: p.people.operator20kv || "",
         pengawasManuver: p.people.pengawasManuver || "",
         pengawasPekerjaan: p.people.pengawasPekerjaan || "",
         pengawasK3: p.people.pengawasK3 || "",
@@ -747,6 +838,21 @@
     $("fTanggal").addEventListener("change", (e) => {
       state.tanggal = e.target.value;
       onChange();
+    });
+    $("tnSeg").addEventListener("click", (e) => {
+      const b = e.target.closest(".tn-btn");
+      if (b) setTnMode(b.dataset.tn);
+    });
+    $("fTanggalPenormalan").addEventListener("change", (e) => {
+      const v = e.target.value;
+      state.tanggalPenormalan = v && v !== state.tanggal ? v : "";
+      state.tnAuto = false;
+      onChange();
+    });
+    $("add20kvBtn").addEventListener("click", () => {
+      state.show20kv = true;
+      onChange();
+      $("fDispatcher20kv").focus();
     });
     $("fKeterangan").addEventListener("input", (e) => {
       state.keterangan = e.target.value;
@@ -861,7 +967,10 @@
           }
           await loadFromDb(id, "lanjutkan");
         }
-        if (tahap === "penormalan") state.stage = "penormalan";
+        if (tahap === "penormalan" && state.stage !== "penormalan") {
+          state.stage = "penormalan";
+          autoTanggalPenormalan();
+        }
         persist();
         history.replaceState(null, "", `#/jurnal/${id}`);
       }

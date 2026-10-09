@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Jurnal GI</title>
+  <title>Jurnal GI Generator</title>
   <meta name="theme-color" content="#d5dad6" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Jurnal GI" />
@@ -33,7 +33,7 @@
       <div class="auth-brand">
         <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M4 3v18"/><path d="M4 12h6"/><rect x="10" y="8" width="8" height="8" rx="1.5" fill="currentColor" stroke="none"/><path d="M18 12h3"/></svg>
         <div>
-          <div class="auth-title">Jurnal GI</div>
+          <div class="auth-title">Jurnal GI Generator <span class="ver">V3</span></div>
           <div class="auth-subtitle">Masuk untuk melanjutkan</div>
         </div>
       </div>
@@ -56,9 +56,10 @@
   <div class="app">
     <header class="app-header">
       <div class="app-header-inner">
-        <a class="wordmark" href="#/" aria-label="Jurnal GI, ke beranda">
+        <a class="wordmark" href="#/" aria-label="Jurnal GI Generator versi 3, ke beranda">
           <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M4 3v18"/><path d="M4 12h6"/><rect x="10" y="8" width="8" height="8" rx="1.5" fill="currentColor" stroke="none"/><path d="M18 12h3"/></svg>
-          <span>Jurnal GI</span>
+          <span>Jurnal GI Generator</span>
+          <span class="ver" aria-hidden="true">V3</span>
         </a>
         <nav class="top-nav" aria-label="Navigasi utama">
           <a href="#/" data-nav="home">Beranda</a>
@@ -90,28 +91,31 @@
 
     <main class="app-main">
       <section id="view-home" class="view">
-        <div class="home-top">
-          <h1 class="sr-only">Beranda</h1>
-          <button type="button" class="btn btn-primary" id="homeNewBtn">+ Jurnal baru</button>
-        </div>
-
+        <h1 class="sr-only">Beranda</h1>
         <div id="homeDraft"></div>
 
-        <div class="sec-head">
-          <h2><span id="homeLiveTitle">Sedang bebas tegangan</span><span class="count" id="homeLiveCount"></span></h2>
-        </div>
-        <div id="homeLive" class="live-list"></div>
+        <div class="home-grid">
+          <div class="home-col">
+            <div class="sec-head">
+              <h2><span id="homeLiveTitle">Sedang bebas tegangan</span><span class="count" id="homeLiveCount"></span></h2>
+              <button type="button" class="btn btn-primary btn-sm" id="homeNewBtn">+ Jurnal baru</button>
+            </div>
+            <div id="homeLive" class="live-list"></div>
 
-        <details class="other-gi" id="homeLiveOtherWrap" hidden>
-          <summary>Bebas tegangan di GI lain <span class="count" id="homeLiveOtherCount"></span></summary>
-          <div id="homeLiveOther"></div>
-        </details>
+            <details class="other-gi" id="homeLiveOtherWrap" hidden>
+              <summary>Bebas tegangan di GI lain <span class="count" id="homeLiveOtherCount"></span></summary>
+              <div id="homeLiveOther"></div>
+            </details>
+          </div>
 
-        <div class="sec-head">
-          <h2 id="homeDoneTitle">Baru selesai</h2>
-          <a href="#/riwayat" class="sec-link">Semua riwayat</a>
+          <div class="home-col">
+            <div class="sec-head">
+              <h2 id="homeDoneTitle">Baru selesai</h2>
+              <a href="#/riwayat" class="sec-link">Semua riwayat</a>
+            </div>
+            <div id="homeDone"></div>
+          </div>
         </div>
-        <div id="homeDone"></div>
       </section>
 
       <section id="view-editor" class="view" hidden>
@@ -152,7 +156,7 @@
                   <select id="fNamaGi" class="form-select"></select>
                 </div>
                 <div class="fld">
-                  <label for="fTanggal">Tanggal <em id="hariLabel"></em></label>
+                  <label for="fTanggal"><span id="tglLabel">Tanggal</span> <em id="hariLabel"></em></label>
                   <input type="date" id="fTanggal" class="form-control" />
                 </div>
               </div>
@@ -192,7 +196,18 @@
               </div>
 
               <div class="mv-section" id="penormalanBlock" hidden>
-                <div class="mv-sec-head"><h3>Penormalan</h3></div>
+                <div class="mv-sec-head">
+                  <h3>Penormalan</h3>
+                  <div class="tn-seg" id="tnSeg" role="group" aria-label="Tanggal penormalan">
+                    <button type="button" class="tn-btn" data-tn="same" aria-pressed="true">Sama hari</button>
+                    <button type="button" class="tn-btn" data-tn="diff" aria-pressed="false">Beda hari</button>
+                  </div>
+                </div>
+                <div class="tn-date" id="tnDateWrap" hidden>
+                  <label for="fTanggalPenormalan">Tanggal penormalan <em id="tnHari"></em></label>
+                  <input type="date" id="fTanggalPenormalan" class="form-control" />
+                </div>
+                <p class="tn-note" id="tnNote" hidden></p>
                 <div id="autoPenormalanCard" class="auto-card">
                   <p><strong>Susun otomatis dari pembebasan.</strong> Urutan dibalik, status <b>#</b> dan <b>//</b> ditukar, jam diisi sendiri.</p>
                   <div class="auto-actions">
@@ -239,7 +254,25 @@
                   <label for="fPelaksanaManuver">Pelaksana manuver</label>
                   <input type="text" id="fPelaksanaManuver" class="form-control" list="dl-pelaksana_manuver" placeholder="Rio - Dimas" />
                 </div>
+                <div class="span2 sub20" id="trafoFields" hidden>
+                  <div class="sub20-head">Bay trafo <small>sisi 20kV</small></div>
+                  <div class="grid2">
+                    <div class="fld">
+                      <label for="fDispatcher20kv">Dispatcher 20kV</label>
+                      <input type="text" id="fDispatcher20kv" class="form-control" list="dl-dispatcher_20kv" placeholder="Velly" />
+                    </div>
+                    <div class="fld">
+                      <label for="fOperator20kv">Operator 20kV</label>
+                      <input type="text" id="fOperator20kv" class="form-control" list="dl-operator_20kv" placeholder="Lukman" />
+                    </div>
+                  </div>
+                </div>
+                <div class="span2 add20" id="add20kvWrap">
+                  <button type="button" class="btn btn-text btn-sm" id="add20kvBtn">+ Kolom 20kV (bay trafo)</button>
+                </div>
                 <datalist id="dl-dispatcher"></datalist>
+                <datalist id="dl-dispatcher_20kv"></datalist>
+                <datalist id="dl-operator_20kv"></datalist>
                 <datalist id="dl-pengawas_manuver"></datalist>
                 <datalist id="dl-pengawas_pekerjaan"></datalist>
                 <datalist id="dl-pengawas_k3"></datalist>
@@ -295,7 +328,10 @@
 
       <section id="view-riwayat" class="view" hidden>
         <div class="page-head">
-          <h1>Riwayat <span class="count muted" id="rwCount"></span></h1>
+          <div>
+            <h1>Riwayat</h1>
+            <p class="page-sub" id="rwCount"></p>
+          </div>
           <div class="dropdown">
             <button type="button" class="icon-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu riwayat">
               <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
@@ -327,7 +363,10 @@
 
       <section id="view-template" class="view" hidden>
         <div class="page-head">
-          <h1>Template</h1>
+          <div>
+            <h1>Template</h1>
+            <p class="page-sub">Urutan manuver yang sering dipakai</p>
+          </div>
           <button type="button" class="btn btn-primary btn-sm" id="tplNewBtn">+ Template</button>
         </div>
 

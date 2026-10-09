@@ -56,6 +56,18 @@ window.ManuverParser = (function () {
       .toUpperCase();
   }
 
+  function canonPeralatan(s) {
+    let e = normEquipment(s)
+      .replace(/\bINC(?:OMM?ING|\.)(?=\s|$)/g, "INC")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (/^PMS INC\b/.test(e)) e = e.replace(/^PMS INC/, "PMT INC");
+    if (e === "PMT 20KV" || e === "PMT INC" || e === "PMT INC 20 KV") e = "PMT INC 20KV";
+    return e;
+  }
+
+  const BAY_CODE_RE = /^\d{2}[A-Z]+\d+[A-Z]?$/i;
+
   function extractWaktuFromLine(line) {
     const s = cleanText(line);
     let m = s.match(/^(\d{1,2})[.:](\d{2})(?::\d{2})?\s*(am|pm)?(?![a-z\d])/i);
@@ -120,11 +132,15 @@ window.ManuverParser = (function () {
     const bayIdx = tokens.findIndex((t) => /^bay$/i.test(t));
     if (bayIdx > 0 && bayIdx < tokens.length - 1) {
       return {
-        peralatan: normEquipment(tokens.slice(0, bayIdx).join(" ")),
+        peralatan: canonPeralatan(tokens.slice(0, bayIdx).join(" ")),
         bay: normEquipment(tokens.slice(bayIdx + 1).join(" ")),
       };
     }
-    return { peralatan: normEquipment(tokens.join(" ")), bay: "" };
+    const last = tokens[tokens.length - 1];
+    if (tokens.length > 1 && BAY_CODE_RE.test(last)) {
+      return { peralatan: canonPeralatan(tokens.slice(0, -1).join(" ")), bay: normEquipment(last) };
+    }
+    return { peralatan: canonPeralatan(tokens.join(" ")), bay: "" };
   }
 
   function parseManuverLine(line) {
@@ -147,10 +163,17 @@ window.ManuverParser = (function () {
       .filter((r) => r.peralatan || r.waktu);
   }
 
+  function monthIndex(word) {
+    const w = word.toLowerCase();
+    let i = MONTHS.indexOf(w);
+    if (i < 0 && w.length >= 3) i = MONTHS.findIndex((m) => m.startsWith(w) || (w === "agt" && m === "agustus"));
+    return i;
+  }
+
   function parseTanggal(s) {
-    const m = s.match(/(\d{1,2})\s*[-\s]\s*([a-z]+)\s*[-\s,]+\s*(\d{4})/i);
+    const m = s.match(/(\d{1,2})\s*[-\s]\s*([a-z]+)\.?\s*[-\s,]+\s*(\d{4})/i);
     if (!m) return "";
-    const mi = MONTHS.indexOf(m[2].toLowerCase());
+    const mi = monthIndex(m[2]);
     if (mi < 0) return "";
     const d = parseInt(m[1], 10);
     if (d < 1 || d > 31) return "";
@@ -158,18 +181,26 @@ window.ManuverParser = (function () {
   }
 
   const PEOPLE = [
-    ["dispatcher", /^(piket\s+)?(dispatcher|dispa|dispat)$/i],
+    ["dispatcher20kv", /^(piket\s+)?(dispatcher|dispa|dispat)\s*(up2d|apd|20\s*kv)$/i],
+    ["operator20kv", /^operator\s*(20\s*kv|up2d|apd)$/i],
+    ["dispatcher", /^(piket\s+)?(dispatcher|dispa|dispat)(\s*(up2b|apb|150\s*kv))?$/i],
     ["pengawasManuver", /^(pengawas\s+manuver|pm)$/i],
     ["pengawasPekerjaan", /^(pengawas\s+pekerjaan|pp)$/i],
     ["pengawasK3", /^(pengawas\s+k3|pk3)$/i],
     ["pelaksanaManuver", /^(pelaksana\s+manuver|pelaksana|pelm)$/i],
   ];
 
+  const SEP_RE = /^[\s\-—–_=~.•*]{3,}$/;
+  const PEMBEBASAN_RE = /^(?:manuver\s+)?(pembebasan|pelepasan|pemadaman)\b/i;
+  const PENORMALAN_RE = /^(?:manuver\s+)?(penormalan|pemberian|pengembalian)\b/i;
+  const KET_RE = /^(ket|keterangan|uraian(?:\s+pekerjaan)?|pekerjaan)\s*:\s*(.*)$/i;
+
   function parseJurnalText(text, giList) {
     const out = {
       giRaw: "",
       namaGi: "",
       tanggal: "",
+      tanggalPenormalan: "",
       keterangan: "",
       pembebasan: [],
       penormalan: [],
@@ -179,16 +210,30 @@ window.ManuverParser = (function () {
       extraJurnal: false,
     };
     const titleLines = [];
+    const ketParts = [];
+    const sectionDate = { pembebasan: "", penormalan: "" };
+    let headerDate = "";
     let section = null;
     let seenManuver = false;
     let seenHeader = false;
+    let expectKet = false;
 
     const lines = String(text || "").split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) {
       const raw = cleanText(lines[i]);
       if (!raw) continue;
+      if (SEP_RE.test(raw)) continue;
       const plain = cleanText(raw.replace(/[*_~]/g, ""));
       if (!plain) continue;
+
+      if (expectKet) {
+        const bullet = plain.match(/^[-•–]\s*(.+)$/);
+        if (bullet) {
+          ketParts.push(cleanText(bullet[1]));
+          continue;
+        }
+        expectKet = false;
+      }
 
       const header = plain.match(/^jurnal(?:\s+manuver)?\s+(?:gi|gitet|gistet|gis|gardu\s+induk)\b\s*(.*)$/i);
       if (header) {
@@ -208,27 +253,28 @@ window.ManuverParser = (function () {
         continue;
       }
 
-      if (/^(pembebasan|pelepasan|pemadaman)\b/i.test(plain)) {
-        section = "pembebasan";
-        continue;
-      }
-      if (/^(penormalan|pemberian|pengembalian|penormalan)\b/i.test(plain)) {
-        section = "penormalan";
-        continue;
-      }
-
-      const ket = raw.match(/^\**\s*ket(?:erangan)?\s*\**\s*:\s*(.+)$/i);
-      if (ket) {
-        out.keterangan = cleanText(ket[1]);
-        continue;
-      }
-
-      if (!out.tanggal && !seenManuver) {
+      const secHit = PEMBEBASAN_RE.test(plain) ? "pembebasan" : PENORMALAN_RE.test(plain) ? "penormalan" : null;
+      if (secHit) {
+        section = secHit;
         const t = parseTanggal(plain);
-        if (t) {
-          out.tanggal = t;
-          continue;
-        }
+        if (t && !sectionDate[secHit]) sectionDate[secHit] = t;
+        continue;
+      }
+
+      const t = parseTanggal(plain);
+      if (t && plain.replace(/[^a-z0-9]/gi, "").length <= 30) {
+        if (section && !sectionDate[section]) sectionDate[section] = t;
+        else if (!headerDate && !seenManuver) headerDate = t;
+        else out.skipped.push(raw);
+        continue;
+      }
+
+      const ket = plain.match(KET_RE);
+      if (ket) {
+        const v = cleanText(ket[2]);
+        if (v) ketParts.push(v);
+        expectKet = true;
+        continue;
       }
 
       if (/^(alhamdulill?ah|bismillah|semoga|terima\s*kasih)/i.test(plain)) {
@@ -250,8 +296,15 @@ window.ManuverParser = (function () {
       else out.skipped.push(raw);
     }
 
+    out.keterangan = ketParts.join("; ");
     if (!out.keterangan && titleLines.length) out.keterangan = titleLines.join(" ");
     else out.skipped.unshift(...titleLines);
+
+    out.tanggal = sectionDate.pembebasan || headerDate || sectionDate.penormalan;
+    if (out.penormalan.length) {
+      const tn = sectionDate.penormalan || (headerDate && headerDate > out.tanggal ? headerDate : "");
+      if (tn && tn !== out.tanggal) out.tanggalPenormalan = tn;
+    }
 
     if (out.giRaw && Array.isArray(giList)) {
       const key = (s) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -268,5 +321,7 @@ window.ManuverParser = (function () {
     parseManuverText,
     parseJurnalText,
     isManuverLine,
+    canonPeralatan,
+    parseTanggal,
   };
 })();
