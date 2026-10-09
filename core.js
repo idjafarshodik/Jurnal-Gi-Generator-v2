@@ -38,6 +38,12 @@
 
   JG.sb = () => window.JurnalAuth.supabaseClient;
   JG.normalizeTime = (v) => normalizeSavedTime(v || "");
+  JG.normEquipment = (s) =>
+    String(s || "")
+      .replace(/\s+/g, " ")
+      .replace(/(\d+)\s*kv\b/gi, "$1KV")
+      .trim()
+      .toUpperCase();
 
   JG.esc = function (str) {
     return String(str ?? "")
@@ -122,10 +128,6 @@
 
   JG.flipStatus = function (s) {
     return { "#": "//", "//": "#", "Draw In": "Draw Out", "Draw Out": "Draw In" }[s] || s;
-  };
-
-  JG.statusClass = function (s) {
-    return { "#": "s-open", "//": "s-close", "Draw In": "s-draw", "Draw Out": "s-draw" }[s] || "s-draw";
   };
 
   JG.buildReadMoreText = function (visiblePart, hiddenPart) {
@@ -226,7 +228,7 @@
       el.textContent = theme === "dark" ? "Mode terang" : "Mode gelap";
     });
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", theme === "dark" ? "#05080a" : "#eef4f2");
+    if (meta) meta.setAttribute("content", theme === "dark" ? "#151c1f" : "#d5dad6");
   };
 
   JG.toggleTheme = function () {
@@ -259,7 +261,7 @@
       let q = JG.sb()
         .from("jurnal_manuver")
         .select(
-          "id, tanggal, hari, keterangan, teks_final, dibuat_oleh, diubah_oleh, tahap_penormalan, created_at, updated_at, gi(nama), jurnal_manuver_rows(section, waktu)"
+          "id, tanggal, hari, keterangan, teks_final, dibuat_oleh, diubah_oleh, tahap_penormalan, created_at, updated_at, gi(nama), jurnal_manuver_rows(section, urutan, waktu, peralatan, bay, status)"
         )
         .order("updated_at", { ascending: false })
         .limit(limit || 200);
@@ -370,7 +372,7 @@
         waktu: withTime ? JG.normalizeTime(r.waktu) : "",
         peralatan: r.peralatan === "PMT 20KV" ? "PMT INC 20KV" : r.peralatan || "",
         bay: (r.bay || "").trim() === bay ? "" : (r.bay || "").trim(),
-        status: r.status || "#",
+        status: r.status || "",
       }));
   };
 
@@ -387,73 +389,203 @@
     return times.length === 1 ? times[0] : `${times[0]}–${times[times.length - 1]}`;
   };
 
+  JG.nextPeralatan = function (section, prev) {
+    if (!prev) return section === "pembebasan" ? JG.PERALATAN[0] : "";
+    const i = JG.PERALATAN.indexOf(prev.peralatan);
+    if (i < 0 || i > 4) return "";
+    const j = section === "pembebasan" ? i + 1 : i - 1;
+    return j >= 0 && j <= 4 ? JG.PERALATAN[j] : "";
+  };
+
+  JG.MINE_KEY = "jurnalGiMine_v1";
+
+  JG.getMine = function () {
+    try {
+      return localStorage.getItem(JG.MINE_KEY) || "";
+    } catch (e) {
+      return "";
+    }
+  };
+
+  JG.setMine = function (gi) {
+    try {
+      if (gi) localStorage.setItem(JG.MINE_KEY, gi);
+      else localStorage.removeItem(JG.MINE_KEY);
+    } catch (e) {}
+  };
+
+  JG.giLabel = function (gi) {
+    const hit = JG.GI_LIST.find(([v]) => v === gi);
+    return hit ? hit[1] : gi || "";
+  };
+
+  JG.dayLabel = function (dateStr) {
+    if (!dateStr) return "Tanpa tanggal";
+    const today = JG.todayIso();
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    const yIso = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`;
+    if (dateStr === today) return "Hari ini";
+    if (dateStr === yIso) return "Kemarin";
+    return `${JG.hariFromDate(dateStr)}, ${JG.formatTanggalIndo(dateStr)}`;
+  };
+
+  JG.elapsedSince = function (dateStr, hhmm) {
+    const t = JG.normalizeTime(hhmm);
+    if (!dateStr || !/^\d{2}:\d{2}$/.test(t)) return "";
+    const start = new Date(`${dateStr}T${t}:00`);
+    const mins = Math.floor((Date.now() - start.getTime()) / 60000);
+    if (isNaN(mins) || mins < 0) return "";
+    const d = Math.floor(mins / 1440);
+    const h = Math.floor((mins % 1440) / 60);
+    const m = mins % 60;
+    if (d) return `${d} hari ${h} jam`;
+    if (h) return `${h} jam ${m} menit`;
+    return `${m} menit`;
+  };
+
+  JG.sortRows = function (rows, section) {
+    return (rows || []).filter((r) => r.section === section).sort((a, b) => a.urutan - b.urutan);
+  };
+
+  JG.bayNames = function (rows) {
+    const seen = [];
+    rows.forEach((r) => {
+      const b = (r.bay || "").trim();
+      if (b && !seen.includes(b)) seen.push(b);
+    });
+    return seen;
+  };
+
+  JG.bayLine = function (rows) {
+    const names = JG.bayNames(rows);
+    if (!names.length) return "";
+    const pretty = (n) => n.charAt(0) + n.slice(1).toLowerCase();
+    if (names.length === 1) return `Bay ${pretty(names[0])}`;
+    if (names.length === 2) return `Bay ${pretty(names[0])} dan ${pretty(names[1])}`;
+    return `${names.length} bay`;
+  };
+
   JG.renderRowList = function (listEl, rows, { withTime = true, bay = "", emptyText = "" } = {}) {
     if (!rows.length) {
       listEl.innerHTML = emptyText ? `<li class="mv-empty">${JG.esc(emptyText)}</li>` : "";
+      listEl.classList.add("is-empty");
       return;
     }
+    listEl.classList.remove("is-empty");
     listEl.innerHTML = rows
       .map((r, i) => {
         const t = JG.normalizeTime(r.waktu);
         const ownBay = r.bay && r.bay !== bay;
-        const bayLine = ownBay ? `<span class="mv-bay">BAY ${JG.esc(r.bay.toUpperCase())}</span>` : !bay && !r.bay ? `<span class="mv-bay mv-bay-missing">Bay belum diisi</span>` : "";
+        const sub = ownBay
+          ? `<small>Bay ${JG.esc(r.bay)}</small>`
+          : !bay && !r.bay
+          ? `<small class="warn">Bay belum diisi</small>`
+          : "";
+        const lead = withTime
+          ? `<span class="mv-time${t ? "" : " is-empty"}">${t || "--:--"}</span>`
+          : `<span class="mv-time mv-no">${i + 1}</span>`;
         return `
-        <li class="mv-item" data-index="${i}" tabindex="0" role="button" aria-label="Ubah manuver ${i + 1}">
-          ${withTime ? `<span class="mv-time ${t ? "" : "is-empty"}">${t || "--:--"}</span>` : `<span class="mv-no">${i + 1}</span>`}
-          <span class="mv-main">
-            <span class="mv-eq">${JG.esc(r.peralatan || "Peralatan?")}</span>
-            ${bayLine}
-          </span>
-          <span class="mv-status ${JG.statusClass(r.status)}">${JG.esc(r.status)}</span>
+        <li class="mv-item" data-index="${i}" tabindex="0" role="button" aria-label="Ubah manuver ${i + 1}: ${JG.esc(r.peralatan)}">
+          ${lead}
+          <span class="mv-node">${JG.sym(JG.eqType(r.peralatan), JG.stateOf(r.status))}</span>
+          <span class="mv-eq">${JG.esc(r.peralatan || "Peralatan?")}${sub}</span>
+          ${JG.statusPill(r.status)}
         </li>`;
       })
       .join("");
   };
 
-  JG.jurnalCardHtml = function (h, { primary } = {}) {
-    const lengkap = !!h.tahap_penormalan;
-    const gi = h.gi?.nama ? `GI ${JG.esc(h.gi.nama)}` : "GI -";
-    const dateLine = [h.hari, h.tanggal ? JG.formatTanggalIndo(h.tanggal) : ""].filter(Boolean).join(", ");
-    const desc = (h.keterangan || "").trim();
-    const rows = h.jurnal_manuver_rows || [];
-    const pb = rows.filter((r) => r.section === "pembebasan");
-    const range = JG.timeRange(pb);
-    const who = h.diubah_oleh && h.diubah_oleh !== h.dibuat_oleh ? `${h.dibuat_oleh || "-"} → ${h.diubah_oleh}` : h.dibuat_oleh || "-";
-    const primaryLabel = primary === "penormalan" && !lengkap ? "Lanjutkan Penormalan" : lengkap ? "Buka" : "Lanjutkan";
-    const primaryAct = primary === "penormalan" && !lengkap ? "penormalan" : "open";
-
+  JG.liveCardHtml = function (h) {
+    const pb = JG.sortRows(h.jurnal_manuver_rows, "pembebasan");
+    const first = pb.find((r) => JG.normalizeTime(r.waktu));
+    const since = first ? JG.normalizeTime(first.waktu) : "";
+    const elapsed = since ? JG.elapsedSince(h.tanggal, since) : "";
+    const sameDay = h.tanggal === JG.todayIso();
+    const sinceText = since
+      ? `Bebas sejak ${sameDay ? "" : `${JG.hariFromDate(h.tanggal)} `}${since}`
+      : `Dibebaskan ${JG.dayLabel(h.tanggal).toLowerCase()}`;
+    const gi = h.gi?.nama ? JG.giLabel(h.gi.nama) : "GI belum dipilih";
     return `
-      <article class="j-card ${lengkap ? "is-done" : "is-open"}" data-id="${h.id}">
-        <div class="j-card-top">
-          <span class="j-gi">${gi}</span>
-          <span class="stage-badge ${lengkap ? "stage-done" : "stage-open"}">${lengkap ? "Lengkap" : "Pembebasan"}</span>
-        </div>
-        <div class="j-date">${JG.esc(dateLine)} · #${h.id}</div>
-        <div class="j-desc ${desc ? "" : "is-empty"}">${desc ? JG.esc(desc) : "Tanpa uraian pekerjaan"}</div>
-        <div class="j-meta">${pb.length} manuver${range ? ` · ${range}` : ""} · ${JG.esc(who)} · ${JG.formatSavedAt(h.updated_at || h.created_at, true)}</div>
-        <div class="j-actions">
-          <button type="button" class="btn btn-sm ${lengkap ? "btn-outline-accent" : "btn-accent"}" data-act="${primaryAct}" data-id="${h.id}">${primaryLabel}</button>
-          <div class="dropdown">
-            <button type="button" class="btn btn-sm btn-outline-secondary btn-more" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aksi lain">⋯</button>
-            <ul class="dropdown-menu dropdown-menu-end">
-              <li><button type="button" class="dropdown-item" data-act="view" data-id="${h.id}">Lihat teks</button></li>
-              <li><button type="button" class="dropdown-item" data-act="copy" data-id="${h.id}">Salin teks</button></li>
-              <li><button type="button" class="dropdown-item" data-act="dasar" data-id="${h.id}">Jadikan dasar jurnal baru</button></li>
-              <li><hr class="dropdown-divider"></li>
-              <li><button type="button" class="dropdown-item text-danger" data-act="delete" data-id="${h.id}">Hapus</button></li>
-            </ul>
+      <article class="live" data-id="${h.id}">
+        <div class="live-top">
+          <div>
+            <div class="live-gi">${JG.esc(gi)}</div>
+            <div class="live-bay">${JG.esc(JG.bayLine(pb) || "Bay belum diisi")}</div>
           </div>
+          <button type="button" class="live-no" data-act="view" data-id="${h.id}" aria-label="Lihat teks jurnal ${h.id}">#${h.id}</button>
+        </div>
+        <div class="live-visual">${JG.bayVisual(pb)}</div>
+        <div class="live-desc">${JG.esc((h.keterangan || "").trim() || "Tanpa uraian pekerjaan")}</div>
+        <div class="live-foot">
+          <div class="since"><span>${JG.esc(sinceText)}</span>${elapsed ? `<strong>${elapsed}</strong>` : ""}</div>
+          <button type="button" class="btn btn-primary" data-act="penormalan" data-id="${h.id}">Normalkan</button>
         </div>
       </article>`;
   };
+
+  JG.logRowHtml = function (h) {
+    const all = h.jurnal_manuver_rows || [];
+    const pb = JG.sortRows(all, "pembebasan");
+    const pn = JG.sortRows(all, "penormalan");
+    const lengkap = !!h.tahap_penormalan;
+    const gi = h.gi?.nama ? JG.giLabel(h.gi.nama) : "GI ?";
+    const bay = JG.bayLine(pb.length ? pb : all);
+    const lastRows = lengkap && pn.length ? pn : pb;
+    const times = lastRows.map((r) => JG.normalizeTime(r.waktu)).filter((t) => /^\d{2}:\d{2}$/.test(t));
+    const end = times.length ? times[times.length - 1] : "--:--";
+    const who = h.diubah_oleh || h.dibuat_oleh || "";
+    return `
+      <li class="log-row${lengkap ? "" : " is-open"}" data-act="view" data-id="${h.id}" tabindex="0" role="button" aria-label="Jurnal ${h.id}, ${JG.esc(gi)}">
+        <span class="log-no">${h.id}</span>
+        <div class="log-main">
+          <div class="log-t1">${JG.esc(gi)}${bay ? `, ${JG.esc(bay.replace(/^Bay /, ""))}` : ""}</div>
+          <div class="log-t2">${lengkap ? "" : `<span class="log-flag">Belum dinormalkan</span> `}${JG.esc((h.keterangan || "").replace(/\*/g, "").trim() || "Tanpa uraian")}</div>
+        </div>
+        <div class="log-tm">${end}<small>${JG.esc(who)}</small></div>
+      </li>`;
+  };
+
+  JG.groupByDay = function (entries, key) {
+    const groups = [];
+    entries.forEach((h) => {
+      const d = key === "updated" ? (JG.parseIso(h.updated_at) ? JG.isoDate(JG.parseIso(h.updated_at)) : "") : h.tanggal || "";
+      let g = groups.find((x) => x.date === d);
+      if (!g) {
+        g = { date: d, items: [] };
+        groups.push(g);
+      }
+      g.items.push(h);
+    });
+    return groups;
+  };
+
+  JG.isoDate = function (d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  JG.STATUS_BTNS = [
+    { value: "#", label: "<b>#</b> Lepas", cls: "g" },
+    { value: "//", label: "<b>//</b> Masuk", cls: "r" },
+    { value: "Draw Out", label: "Draw Out", cls: "g" },
+    { value: "Draw In", label: "Draw In", cls: "r" },
+  ];
 
   JG.rowSheet = (function () {
     let el;
     let bs;
     let cfg = null;
     let selectedPeralatan = "";
-    let selectedStatus = "#";
+    let selectedStatus = "";
     const $ = (id) => document.getElementById(id);
+    const PRETTY = {
+      "PMT 150KV": "PMT",
+      "PMS BUS A 150KV": "PMS Bus A",
+      "PMS BUS B 150KV": "PMS Bus B",
+      "PMS LINE 150KV": "PMS Line",
+      "PMS GROUND 150KV": "PMS Ground",
+      "PMT INC 20KV": "PMT Inc 20KV",
+    };
 
     function init() {
       if (el) return;
@@ -461,25 +593,25 @@
       bs = bootstrap.Offcanvas.getOrCreateInstance(el);
 
       $("rsPeralatan").innerHTML =
-        JG.PERALATAN.map((p) => `<button type="button" class="chip-btn" data-value="${p}">${p.replace(" 150KV", "")}</button>`).join("") +
-        `<button type="button" class="chip-btn" data-value="__custom">Lainnya…</button>`;
+        JG.PERALATAN.map((p) => `<button type="button" class="eq-btn" data-value="${p}" aria-pressed="false">${JG.sym(JG.eqType(p), null, 22)}<span>${PRETTY[p] || p}</span></button>`).join("") +
+        `<button type="button" class="eq-btn" data-value="__custom" aria-pressed="false">${JG.sym("other", null, 22)}<span>Lainnya…</span></button>`;
 
-      $("rsStatus").innerHTML = JG.STATUS.map((s) => `<button type="button" class="seg-btn" data-value="${s}">${s}</button>`).join("");
+      $("rsStatus").innerHTML =
+        JG.STATUS_BTNS.map((s) => `<button type="button" class="st-btn ${s.cls}" data-value="${s.value}" aria-pressed="false">${s.label}</button>`).join("") +
+        `<button type="button" class="st-btn st-btn-other" data-value="__custom" aria-pressed="false">Status lain…</button>`;
 
       $("rsPeralatan").addEventListener("click", (e) => {
-        const b = e.target.closest(".chip-btn");
+        const b = e.target.closest(".eq-btn");
         if (!b) return;
-        if (b.dataset.value === "__custom") {
-          setPeralatan("__custom");
-          $("rsPeralatanCustom").focus();
-        } else {
-          setPeralatan(b.dataset.value);
-        }
+        setPeralatan(b.dataset.value);
+        if (b.dataset.value === "__custom") $("rsPeralatanCustom").focus();
       });
 
       $("rsStatus").addEventListener("click", (e) => {
-        const b = e.target.closest(".seg-btn");
-        if (b) setStatus(b.dataset.value);
+        const b = e.target.closest(".st-btn");
+        if (!b) return;
+        setStatus(b.dataset.value);
+        if (b.dataset.value === "__custom") $("rsStatusCustom").focus();
       });
 
       const waktu = $("rsWaktu");
@@ -494,8 +626,8 @@
       });
 
       $("rsTimeChips").addEventListener("click", (e) => {
-        const b = e.target.closest(".chip-btn");
-        if (!b || b.disabled) return;
+        const b = e.target.closest(".chip");
+        if (!b || b.disabled || !cfg) return;
         const v = b.dataset.time;
         waktu.value = v === "now" ? JG.nowHHMM() : JG.addMinutes(cfg.prevTime, parseInt(v, 10));
         $("rsWaktuError").hidden = true;
@@ -503,7 +635,7 @@
 
       $("rowSheetForm").addEventListener("submit", (e) => {
         e.preventDefault();
-        submit(cfg && cfg.isNew);
+        submit(!!(cfg && cfg.isNew));
       });
       $("rsSave").addEventListener("click", () => submit(false));
       $("rsSaveNext").addEventListener("click", () => submit(true));
@@ -514,7 +646,6 @@
       });
       $("rsUp").addEventListener("click", () => move(-1));
       $("rsDown").addEventListener("click", () => move(1));
-
       el.addEventListener("hidden.bs.offcanvas", () => {
         cfg = null;
       });
@@ -522,15 +653,16 @@
 
     function setPeralatan(v) {
       selectedPeralatan = v;
-      const custom = v === "__custom";
-      $("rsPeralatan").querySelectorAll(".chip-btn").forEach((b) => b.classList.toggle("is-active", b.dataset.value === v));
-      $("rsPeralatanCustom").hidden = !custom;
+      $("rsPeralatan").querySelectorAll(".eq-btn").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.value === v)));
+      $("rsPeralatanCustom").hidden = v !== "__custom";
       $("rsPeralatanError").hidden = true;
     }
 
     function setStatus(v) {
       selectedStatus = v;
-      $("rsStatus").querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("is-active", b.dataset.value === v));
+      $("rsStatus").querySelectorAll(".st-btn").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.value === v)));
+      $("rsStatusCustom").hidden = v !== "__custom";
+      $("rsStatusError").hidden = true;
     }
 
     function load(c) {
@@ -540,21 +672,27 @@
       $("rsTimeField").hidden = !c.withTime;
       $("rsWaktu").value = row.waktu || "";
       $("rsWaktuError").hidden = true;
-      $("rsPeralatanError").hidden = true;
 
-      const known = JG.PERALATAN.includes(row.peralatan);
-      if (row.peralatan && !known) {
+      if (row.peralatan && !JG.PERALATAN.includes(row.peralatan)) {
         setPeralatan("__custom");
         $("rsPeralatanCustom").value = row.peralatan;
       } else {
         setPeralatan(row.peralatan || "");
         $("rsPeralatanCustom").value = "";
       }
-      setStatus(row.status || "#");
+
+      const known = JG.STATUS_BTNS.some((s) => s.value === row.status);
+      if (row.status && !known) {
+        setStatus("__custom");
+        $("rsStatusCustom").value = row.status;
+      } else {
+        setStatus(row.status || "");
+        $("rsStatusCustom").value = "";
+      }
 
       $("rsBay").value = row.bay || "";
-      $("rsBay").placeholder = c.defaultBay ? `Ikut bay jurnal: ${c.defaultBay}` : "Contoh: GULUKGULUK 2";
-      $("rsBayHint").textContent = c.defaultBay ? "kosongkan kalau sama" : "";
+      $("rsBay").placeholder = c.defaultBay ? `Sama dengan bay jurnal (${c.defaultBay})` : "Contoh: GULUKGULUK 2";
+      $("rsBayHint").textContent = "";
 
       $("rsTimeChips").querySelectorAll("[data-time]").forEach((b) => {
         if (b.dataset.time !== "now") b.disabled = !JG.normalizeTime(c.prevTime);
@@ -570,10 +708,11 @@
     }
 
     function readRow() {
-      const peralatan = selectedPeralatan === "__custom" ? $("rsPeralatanCustom").value.trim().toUpperCase() : selectedPeralatan;
+      const peralatan = selectedPeralatan === "__custom" ? JG.normEquipment($("rsPeralatanCustom").value) : selectedPeralatan;
+      const status = selectedStatus === "__custom" ? $("rsStatusCustom").value.trim() : selectedStatus;
       let waktu = cfg.withTime ? $("rsWaktu").value.trim() : "";
       if (waktu) waktu = JG.normalizeTime(waktu);
-      return { waktu, peralatan, bay: $("rsBay").value.trim().toUpperCase(), status: selectedStatus };
+      return { waktu, peralatan, bay: JG.normEquipment($("rsBay").value), status };
     }
 
     function submit(next) {
@@ -582,6 +721,10 @@
       let bad = false;
       if (!row.peralatan) {
         $("rsPeralatanError").hidden = false;
+        bad = true;
+      }
+      if (!row.status) {
+        $("rsStatusError").hidden = false;
         bad = true;
       }
       if (row.waktu && !/^\d{2}:\d{2}$/.test(row.waktu)) {

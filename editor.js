@@ -148,17 +148,17 @@
 
   function renderSummaries() {
     const names = PEOPLE.map(([k]) => (state[k] || "").trim()).filter(Boolean);
-    $("pengawasSummary").textContent = names.length ? names.join(" · ") : "Belum diisi";
+    $("pengawasSummary").textContent = names.length ? names.join(", ") : "Belum diisi";
     $("pengawasSummary").classList.toggle("is-empty", !names.length);
     const msg = (state[stageMsgKey()] || "").trim();
     $("pesanSummary").textContent = msg || "Pakai pesan default";
-    $("hariLabel").textContent = state.tanggal ? `· ${JG.hariFromDate(state.tanggal)}` : "";
+    $("hariLabel").textContent = state.tanggal ? JG.hariFromDate(state.tanggal) : "";
     $("bayChipText").textContent = state.bay || "Atur bay";
     $("bayChip").classList.toggle("is-empty", !state.bay);
 
     const pb = state.pembebasan;
     const range = JG.timeRange(pb);
-    $("pembebasanSummaryText").textContent = pb.length ? `${pb.length} manuver${range ? ` · ${range}` : ""}` : "Belum ada manuver";
+    $("pembebasanSummaryText").textContent = pb.length ? `${pb.length} manuver${range ? `, ${range}` : ""}` : "Belum ada manuver";
   }
 
   function renderLists() {
@@ -214,14 +214,6 @@
     return section === "pembebasan" ? state.pembebasan : state.penormalan;
   }
 
-  function defaultPeralatan(section, prev) {
-    if (!prev) return section === "pembebasan" ? JG.PERALATAN[0] : "";
-    const i = JG.PERALATAN.indexOf(prev.peralatan);
-    if (i < 0 || i > 4) return "";
-    const j = section === "pembebasan" ? i + 1 : i - 1;
-    return j >= 0 && j <= 4 ? JG.PERALATAN[j] : "";
-  }
-
   function sheetCfg(section, index) {
     const rows = sectionRows(section);
     const isNew = index < 0;
@@ -230,7 +222,7 @@
     const row = isNew
       ? {
           waktu: "",
-          peralatan: defaultPeralatan(section, rows[rows.length - 1]),
+          peralatan: JG.nextPeralatan(section, rows[rows.length - 1]),
           bay: "",
           status: prev ? prev.status : section === "pembebasan" ? "#" : "//",
         }
@@ -494,7 +486,7 @@
   }
 
   function resetToNew() {
-    state = newState();
+    state = { ...newState(), namaGi: JG.getMine() };
     active = { ...EMPTY_ACTIVE };
     showPembebasanList = false;
     persist();
@@ -539,7 +531,7 @@
       cancelButtonText: "Batal",
     });
     if (!isConfirmed) return;
-    const nb = (value || "").trim().toUpperCase();
+    const nb = JG.normEquipment(value);
     [state.pembebasan, state.penormalan].forEach((rows) =>
       rows.forEach((r) => {
         if (r.bay === nb) r.bay = "";
@@ -550,44 +542,138 @@
     onChange();
   }
 
-  let importSection = "pembebasan";
+  let importMode = "pembebasan";
   let importParsed = [];
+  let importFull = null;
 
-  function openImport(section) {
-    importSection = section;
+  function openImport(mode) {
+    importMode = mode;
     importParsed = [];
+    importFull = null;
+    const full = mode === "full";
     $("importTextArea").value = "";
     $("importPreviewWrap").hidden = true;
+    $("importSummary").hidden = true;
     $("importApplyBtn").disabled = true;
-    $("importTitle").textContent = `Import ${section === "pembebasan" ? "pembebasan" : "penormalan"} dari teks`;
+    $("importTitle").textContent = full
+      ? "Tempel jurnal lengkap"
+      : `Tambah baris ${mode === "pembebasan" ? "pembebasan" : "penormalan"} dari teks`;
+    $("importHint").textContent = full
+      ? "Tempel satu jurnal utuh dari WhatsApp. Gardu induk, tanggal, uraian, manuver, pengawas, dan pesan penutup akan dikenali otomatis."
+      : "Satu manuver per baris: jam, peralatan, bay, lalu status (#, //, Lepas, Masuk, Draw In, Draw Out).";
+    $("importApplyBtn").textContent = full ? "Pakai jurnal ini" : "Tambahkan";
+    $("importTextArea").rows = full ? 10 : 6;
     bootstrap.Modal.getOrCreateInstance($("importModal")).show();
     setTimeout(() => $("importTextArea").focus(), 250);
   }
 
-  function renderImportPreview() {
-    const text = $("importTextArea").value;
-    importParsed = text.trim() ? window.ManuverParser.parseManuverText(text) : [];
-    $("importPreviewWrap").hidden = !importParsed.length;
-    $("importApplyBtn").disabled = !importParsed.length;
-    $("importPreviewBody").innerHTML = importParsed
-      .map((r) => `<tr><td>${r.waktu || "__:__"}</td><td>${JG.esc(r.peralatan || "-")}</td><td>${JG.esc(r.bay || "-")}</td><td>${JG.esc(r.status)}</td></tr>`)
+  function rowsTableHtml(rows) {
+    return rows
+      .map(
+        (r) =>
+          `<tr><td>${r.waktu || "--:--"}</td><td>${JG.esc(r.peralatan || "-")}</td><td>${JG.esc(r.bay || "-")}</td><td>${JG.statusPill(r.status)}</td></tr>`
+      )
       .join("");
   }
 
-  function applyImport() {
-    if (!importParsed.length) return;
-    const rows = sectionRows(importSection);
-    const parsedBay = JG.inferBay(importParsed);
-    if (!state.bay && parsedBay) state.bay = parsedBay.toUpperCase();
-    importParsed.forEach((r) => {
-      const bay = (r.bay || "").toUpperCase();
-      rows.push({
+  function renderImportPreview() {
+    const text = $("importTextArea").value;
+    if (importMode !== "full") {
+      importParsed = text.trim() ? window.ManuverParser.parseManuverText(text) : [];
+      $("importPreviewWrap").hidden = !importParsed.length;
+      $("importApplyBtn").disabled = !importParsed.length;
+      $("importPreviewBody").innerHTML = rowsTableHtml(importParsed);
+      return;
+    }
+
+    importFull = text.trim() ? window.ManuverParser.parseJurnalText(text, JG.GI_LIST.map(([v]) => v)) : null;
+    const p = importFull;
+    const usable = p && (p.pembebasan.length || p.penormalan.length);
+    $("importApplyBtn").disabled = !usable;
+    $("importSummary").hidden = !p;
+    if (!p) return;
+
+    const giText = p.namaGi
+      ? JG.giLabel(p.namaGi)
+      : p.giRaw
+      ? `<span class="warn">"${JG.esc(p.giRaw)}" belum ada di daftar GI, pilih manual setelah dipakai</span>`
+      : `<span class="warn">Tidak ditemukan</span>`;
+    const people = [
+      ["Dispatcher", p.people.dispatcher],
+      ["Pengawas manuver", p.people.pengawasManuver],
+      ["Pengawas pekerjaan", p.people.pengawasPekerjaan],
+      ["Pengawas K3", p.people.pengawasK3],
+      ["Pelaksana manuver", p.people.pelaksanaManuver],
+    ].filter(([, v]) => v);
+    const item = (k, v) => `<div class="imp-item"><dt>${k}</dt><dd>${v}</dd></div>`;
+    $("importSummary").innerHTML = `
+      <dl class="imp-sum">
+        ${item("Gardu induk", giText)}
+        ${item("Tanggal", p.tanggal ? JG.esc(`${JG.hariFromDate(p.tanggal)}, ${JG.formatTanggalIndo(p.tanggal)}`) : '<span class="warn">Tidak ditemukan</span>')}
+        ${item("Uraian", JG.esc(p.keterangan) || '<span class="muted">Kosong</span>')}
+        ${item("Manuver", `${p.pembebasan.length} pembebasan, ${p.penormalan.length} penormalan`)}
+        ${item("Pengawas", people.length ? people.map(([k, v]) => `${k}: ${JG.esc(v)}`).join("<br>") : '<span class="muted">Kosong</span>')}
+        ${item("Pesan penutup", JG.esc(p.pesan) || '<span class="muted">Pakai pesan default</span>')}
+      </dl>
+      ${p.pembebasan.length ? `<div class="imp-visual"><div class="imp-label">Posisi setelah pembebasan</div>${JG.bayVisual(p.pembebasan)}</div>` : ""}
+      ${p.pembebasan.length ? `<div class="imp-label">Pembebasan</div><div class="table-responsive"><table class="table table-sm imp-table"><tbody>${rowsTableHtml(p.pembebasan)}</tbody></table></div>` : ""}
+      ${p.penormalan.length ? `<div class="imp-label">Penormalan</div><div class="table-responsive"><table class="table table-sm imp-table"><tbody>${rowsTableHtml(p.penormalan)}</tbody></table></div>` : ""}
+      ${p.skipped.length ? `<div class="imp-skip"><div class="imp-label">Tidak ikut dipakai (${p.skipped.length} baris)</div><ul>${p.skipped.map((l) => `<li>${JG.esc(l)}</li>`).join("")}</ul></div>` : ""}
+      ${p.extraJurnal ? `<div class="imp-skip warn">Teks berisi lebih dari satu jurnal. Hanya jurnal pertama yang dipakai.</div>` : ""}
+      ${!usable ? `<div class="imp-skip warn">Belum ada baris manuver yang dikenali. Baris manuver harus diawali jam, contoh 07.58 atau 07:58.</div>` : ""}`;
+  }
+
+  function toStateRows(rows, bay) {
+    return rows.map((r) => {
+      const b = JG.normEquipment(r.bay);
+      return {
         waktu: JG.normalizeTime(r.waktu),
-        peralatan: (r.peralatan || "").toUpperCase(),
-        bay: bay === state.bay ? "" : bay,
-        status: r.status || "#",
-      });
+        peralatan: JG.normEquipment(r.peralatan),
+        bay: b === bay ? "" : b,
+        status: r.status || "",
+      };
     });
+  }
+
+  function applyImport() {
+    if (importMode === "full") {
+      const p = importFull;
+      if (!p) return;
+      const all = [...p.pembebasan, ...p.penormalan];
+      const bay = JG.normEquipment(JG.inferBay(all));
+      const stage = p.penormalan.length ? "penormalan" : "pembebasan";
+      state = {
+        ...newState(),
+        namaGi: p.namaGi || "",
+        tanggal: p.tanggal || "",
+        keterangan: p.keterangan || "",
+        bay,
+        dispatcher: p.people.dispatcher || "",
+        pengawasManuver: p.people.pengawasManuver || "",
+        pengawasPekerjaan: p.people.pengawasPekerjaan || "",
+        pengawasK3: p.people.pengawasK3 || "",
+        pelaksanaManuver: p.people.pelaksanaManuver || "",
+        stage,
+        pembebasan: toStateRows(p.pembebasan, bay),
+        penormalan: toStateRows(p.penormalan, bay),
+      };
+      if (p.pesan) state[stage === "penormalan" ? "pesanPenormalan" : "pesanPembebasan"] = p.pesan;
+      active = { ...EMPTY_ACTIVE };
+      showPembebasanList = false;
+      persist();
+      bootstrap.Modal.getOrCreateInstance($("importModal")).hide();
+      $("pengawasPanel").open = !PEOPLE.some(([k]) => (state[k] || "").trim());
+      renderAll();
+      if (!p.namaGi && p.giRaw) JG.toast("warning", "Jurnal dipakai, tapi GI belum dipilih", `"${p.giRaw}" belum ada di daftar GI.`, 2800);
+      else JG.toast("success", "Jurnal dipakai", "Cek lagi sebelum disimpan.", 1800);
+      return;
+    }
+
+    if (!importParsed.length) return;
+    const rows = sectionRows(importMode);
+    const parsedBay = JG.normEquipment(JG.inferBay(importParsed));
+    if (!state.bay && parsedBay) state.bay = parsedBay;
+    toStateRows(importParsed, state.bay).forEach((r) => rows.push(r));
     bootstrap.Modal.getOrCreateInstance($("importModal")).hide();
     renderLists();
     onChange();
@@ -719,6 +805,7 @@
       if (!b) return;
       const a = b.dataset.action;
       if (a === "import") openImport(state.stage);
+      if (a === "full") location.hash = "#/jurnal?impor=1";
       if (a === "template") saveAsTemplate();
       if (a === "dasar") {
         if (active.id == null) {
@@ -745,16 +832,17 @@
     const dasar = params.get("dasar");
     const tpl = params.get("template");
     const baru = params.get("baru");
+    const impor = params.get("impor");
     const tahap = params.get("tahap");
 
     try {
-      if (dasar || tpl || baru) {
+      if (dasar || tpl || baru || impor) {
         if (!(await confirmDiscard())) {
           history.replaceState(null, "", active.id != null ? `#/jurnal/${active.id}` : "#/jurnal");
           renderAll();
           return;
         }
-        if (baru) resetToNew();
+        if (baru || impor) resetToNew();
         else if (dasar) {
           await loadFromDb(dasar, "dasar");
           JG.toast("success", "Jurnal baru dari riwayat", "Tanggal hari ini, jam manuver dikosongkan.", 2000);
@@ -785,6 +873,7 @@
     const pengawasPanel = $("pengawasPanel");
     pengawasPanel.open = !PEOPLE.some(([k]) => (state[k] || "").trim());
     renderAll();
+    if (impor) openImport("full");
   }
 
   JG.editor = {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Jurnal GI</title>
-  <meta name="theme-color" content="#eef4f2" />
+  <meta name="theme-color" content="#d5dad6" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Jurnal GI" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -22,7 +22,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -30,29 +30,25 @@
 <body data-route="home">
   <div id="authGate" class="auth-gate">
     <div class="auth-card">
-      <div class="d-flex align-items-center gap-2 mb-3">
-        <span class="brand-mark">GI</span>
+      <div class="auth-brand">
+        <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M4 3v18"/><path d="M4 12h6"/><rect x="10" y="8" width="8" height="8" rx="1.5" fill="currentColor" stroke="none"/><path d="M18 12h3"/></svg>
         <div>
-          <div class="auth-title">Jurnal GI Generator</div>
+          <div class="auth-title">Jurnal GI</div>
           <div class="auth-subtitle">Masuk untuk melanjutkan</div>
         </div>
       </div>
       <form id="authGateForm" autocomplete="off">
         <label class="form-label" for="authName">Nama</label>
-        <div class="field-icon mb-3">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-          <input type="text" id="authName" class="form-control" placeholder="Nama kamu" autocomplete="off" required />
-        </div>
+        <input type="text" id="authName" class="form-control mb-3" placeholder="Nama kamu" autocomplete="off" required />
         <label class="form-label" for="authPassword">Password</label>
-        <div class="field-icon auth-pw-field mb-2">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <div class="auth-pw-field mb-2">
           <input type="password" id="authPassword" class="form-control" placeholder="Password akses" autocomplete="current-password" required />
           <button type="button" id="authTogglePw" class="auth-pw-toggle" aria-label="Tampilkan password">
             <svg id="authEyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
           </button>
         </div>
         <div id="authError" class="auth-error"></div>
-        <button type="submit" class="btn btn-accent w-100 mt-2">Masuk</button>
+        <button type="submit" class="btn btn-primary w-100 mt-2">Masuk</button>
       </form>
     </div>
   </div>
@@ -60,10 +56,9 @@
   <div class="app">
     <header class="app-header">
       <div class="app-header-inner">
-        <a class="brand" href="#/">
-          <span class="brand-mark">GI</span>
-          <span class="brand-name">Jurnal GI</span>
-          <span class="badge badge-soft">v3</span>
+        <a class="wordmark" href="#/" aria-label="Jurnal GI, ke beranda">
+          <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M4 3v18"/><path d="M4 12h6"/><rect x="10" y="8" width="8" height="8" rx="1.5" fill="currentColor" stroke="none"/><path d="M18 12h3"/></svg>
+          <span>Jurnal GI</span>
         </a>
         <nav class="top-nav" aria-label="Navigasi utama">
           <a href="#/" data-nav="home">Beranda</a>
@@ -71,18 +66,23 @@
           <a href="#/template" data-nav="template">Template</a>
         </nav>
         <div class="dropdown">
-          <button type="button" class="avatar-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu akun">
+          <button type="button" class="avatar" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu akun">
             <span id="avatarInitial">?</span>
           </button>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><span class="dropdown-header" id="profileName">Operator</span></li>
             <li>
+              <button type="button" class="dropdown-item item-split" id="mineBtn">
+                <span>GI saya</span><span class="item-value" id="mineLabel">Semua GI</span>
+              </button>
+            </li>
+            <li>
               <button type="button" class="dropdown-item" id="themeToggle">
-                <span data-theme-icon>🌙</span> <span data-theme-label>Mode gelap</span>
+                <span data-theme-icon aria-hidden="true">🌙</span> <span data-theme-label>Mode gelap</span>
               </button>
             </li>
             <li><hr class="dropdown-divider" /></li>
-            <li><button type="button" class="dropdown-item text-danger" id="authLogoutBtn">Keluar</button></li>
+            <li><button type="button" class="dropdown-item is-danger" id="authLogoutBtn">Keluar</button></li>
           </ul>
         </div>
       </div>
@@ -90,49 +90,46 @@
 
     <main class="app-main">
       <section id="view-home" class="view">
-        <div class="page-head">
-          <div>
-            <h1 class="page-title">Jurnal GI</h1>
-            <div class="page-sub" id="homeGreeting"></div>
-          </div>
-          <button type="button" class="btn btn-accent" id="homeNewBtn">+ Jurnal Baru</button>
+        <div class="home-top">
+          <h1 class="sr-only">Beranda</h1>
+          <button type="button" class="btn btn-primary" id="homeNewBtn">+ Jurnal baru</button>
         </div>
 
         <div id="homeDraft"></div>
 
-        <div class="list-section">
-          <div class="list-head">
-            <h2>Menunggu penormalan <span class="count-pill" id="homeOpenCount"></span></h2>
-          </div>
-          <div id="homeOpenList" class="card-grid"></div>
+        <div class="sec-head">
+          <h2><span id="homeLiveTitle">Sedang bebas tegangan</span><span class="count" id="homeLiveCount"></span></h2>
         </div>
+        <div id="homeLive" class="live-list"></div>
 
-        <div class="list-section">
-          <div class="list-head">
-            <h2>Baru selesai</h2>
-            <a href="#/riwayat" class="list-link">Semua riwayat →</a>
-          </div>
-          <div id="homeDoneList" class="card-grid"></div>
+        <details class="other-gi" id="homeLiveOtherWrap" hidden>
+          <summary>Bebas tegangan di GI lain <span class="count" id="homeLiveOtherCount"></span></summary>
+          <div id="homeLiveOther"></div>
+        </details>
+
+        <div class="sec-head">
+          <h2 id="homeDoneTitle">Baru selesai</h2>
+          <a href="#/riwayat" class="sec-link">Semua riwayat</a>
         </div>
+        <div id="homeDone"></div>
       </section>
 
       <section id="view-editor" class="view" hidden>
-        <div class="editor-topbar">
+        <div class="ed-top">
           <a href="#/" class="icon-btn" aria-label="Kembali ke beranda">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </a>
-          <div class="editor-heading">
-            <div class="editor-title" id="editorTitle">Jurnal baru</div>
-            <div id="saveStatus" class="save-status" data-state="empty" role="status" aria-live="polite">
-              <span class="save-dot"></span><span id="saveStatusText">Kosong</span>
-            </div>
+          <div class="ed-title">
+            <h1 id="editorTitle">Jurnal baru</h1>
+            <div id="saveStatus" class="save-status" data-state="empty" role="status" aria-live="polite"><span id="saveStatusText">Kosong</span></div>
           </div>
           <div class="dropdown">
             <button type="button" class="icon-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu jurnal">
               <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
             </button>
             <ul class="dropdown-menu dropdown-menu-end" id="editorMenu">
-              <li><button type="button" class="dropdown-item" data-action="import">Import dari teks</button></li>
+              <li><button type="button" class="dropdown-item" data-action="full">Tempel jurnal lengkap dari WhatsApp</button></li>
+              <li><button type="button" class="dropdown-item" data-action="import">Tambah baris manuver dari teks</button></li>
               <li><button type="button" class="dropdown-item" data-action="template">Simpan sebagai template</button></li>
               <li><button type="button" class="dropdown-item" data-action="dasar">Jadikan dasar jurnal baru</button></li>
               <li><hr class="dropdown-divider" /></li>
@@ -141,103 +138,105 @@
           </div>
         </div>
 
-        <div class="editor-grid">
-          <div class="editor-main">
-            <div class="stage-switch" id="stageSwitch" role="tablist" aria-label="Tahap jurnal">
-              <button type="button" class="stage-btn is-active" data-stage="pembebasan" role="tab"><span>1</span> Pembebasan</button>
-              <button type="button" class="stage-btn" data-stage="penormalan" role="tab"><span>2</span> Penormalan</button>
+        <div class="ed-grid">
+          <div class="ed-main">
+            <div class="stage" id="stageSwitch" role="tablist" aria-label="Tahap jurnal">
+              <button type="button" class="stage-btn" data-stage="pembebasan" role="tab" aria-selected="true">Bebaskan</button>
+              <button type="button" class="stage-btn" data-stage="penormalan" role="tab" aria-selected="false">Normalkan</button>
             </div>
 
-            <div class="panel">
-              <div class="grid-2">
-                <div>
-                  <label class="form-label" for="fNamaGi">Gardu Induk</label>
+            <div class="plate">
+              <div class="grid2">
+                <div class="fld">
+                  <label for="fNamaGi">Gardu induk</label>
                   <select id="fNamaGi" class="form-select"></select>
                 </div>
-                <div>
-                  <label class="form-label" for="fTanggal">Tanggal <span id="hariLabel" class="label-hint"></span></label>
+                <div class="fld">
+                  <label for="fTanggal">Tanggal <em id="hariLabel"></em></label>
                   <input type="date" id="fTanggal" class="form-control" />
                 </div>
               </div>
-              <label class="form-label mt-3" for="fKeterangan">Uraian pekerjaan</label>
-              <textarea id="fKeterangan" rows="2" class="form-control" placeholder="Contoh: Pemeliharaan Bay Sampang oleh PDKB"></textarea>
+              <div class="fld mt-2">
+                <label for="fKeterangan">Uraian pekerjaan</label>
+                <textarea id="fKeterangan" rows="2" class="form-control" placeholder="Contoh: Pemeliharaan 2 tahunan bay Sampang 2"></textarea>
+              </div>
             </div>
 
-            <div class="panel">
-              <div class="panel-head">
-                <h2 class="panel-title">Manuver</h2>
-                <button type="button" class="bay-chip" id="bayChip" aria-label="Atur bay jurnal">
-                  <span class="bay-chip-k">BAY</span>
-                  <span id="bayChipText">Atur bay</span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            <div class="plate">
+              <div class="mv-head">
+                <h2>Manuver</h2>
+                <button type="button" class="bay-chip" id="bayChip" aria-label="Atur bay untuk jurnal ini">
+                  <span>Bay</span><b id="bayChipText">Atur bay</b>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 </button>
               </div>
 
               <div class="mv-section">
-                <div class="mv-section-head">
-                  <span class="mv-section-title">Pembebasan tegangan</span>
+                <div class="mv-sec-head">
+                  <h3>Pembebasan</h3>
                   <div id="pembebasanSummary" class="mv-summary" hidden>
                     <span id="pembebasanSummaryText"></span>
-                    <button type="button" class="link-btn" id="pembebasanToggleBtn">Ubah</button>
+                    <button type="button" class="btn btn-text btn-sm" id="pembebasanToggleBtn">Ubah</button>
                   </div>
                 </div>
                 <div id="pembebasanBody">
-                  <ol id="pembebasanList" class="mv-list"></ol>
-                  <div class="mv-actions">
-                    <button type="button" class="btn btn-sm btn-outline-accent" data-add-row="pembebasan">+ Tambah</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-import="pembebasan">Import teks</button>
+                  <ol id="pembebasanList" class="rail"></ol>
+                  <div class="rail-actions">
+                    <button type="button" class="rail-add" data-add-row="pembebasan">
+                      <span class="rail-add-node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></span>
+                      Tambah manuver
+                    </button>
+                    <button type="button" class="btn btn-text btn-sm" data-import="pembebasan">Dari teks</button>
                   </div>
                 </div>
               </div>
 
               <div class="mv-section" id="penormalanBlock" hidden>
-                <div class="mv-section-head">
-                  <span class="mv-section-title">Penormalan tegangan</span>
-                </div>
+                <div class="mv-sec-head"><h3>Penormalan</h3></div>
                 <div id="autoPenormalanCard" class="auto-card">
-                  <div class="auto-card-text">
-                    <strong>Susun otomatis dari pembebasan</strong>
-                    <span>Urutan dibalik, status <code>#</code> ↔ <code>//</code> ditukar. Tinggal isi jamnya.</span>
-                  </div>
-                  <div class="auto-card-actions">
-                    <button type="button" class="btn btn-sm btn-accent" id="autoPenormalanBtn">Susun otomatis</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-add-row="penormalan">Isi manual</button>
+                  <p><strong>Susun otomatis dari pembebasan.</strong> Urutan dibalik, status <b>#</b> dan <b>//</b> ditukar, jam diisi sendiri.</p>
+                  <div class="auto-actions">
+                    <button type="button" class="btn btn-primary btn-sm" id="autoPenormalanBtn">Susun otomatis</button>
+                    <button type="button" class="btn btn-sm" data-add-row="penormalan">Isi manual</button>
                   </div>
                 </div>
-                <ol id="penormalanList" class="mv-list"></ol>
-                <div class="mv-actions" id="penormalanActions">
-                  <button type="button" class="btn btn-sm btn-outline-accent" data-add-row="penormalan">+ Tambah</button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-import="penormalan">Import teks</button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" id="autoPenormalanAgainBtn">Susun ulang</button>
+                <ol id="penormalanList" class="rail"></ol>
+                <div class="rail-actions" id="penormalanActions">
+                  <button type="button" class="rail-add" data-add-row="penormalan">
+                    <span class="rail-add-node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></span>
+                    Tambah manuver
+                  </button>
+                  <button type="button" class="btn btn-text btn-sm" data-import="penormalan">Dari teks</button>
+                  <button type="button" class="btn btn-text btn-sm" id="autoPenormalanAgainBtn">Susun ulang</button>
                 </div>
               </div>
             </div>
 
-            <details class="panel panel-collapse" id="pengawasPanel">
+            <details class="fold" id="pengawasPanel">
               <summary>
-                <span class="panel-title">Pengawas</span>
-                <span class="summary-text" id="pengawasSummary"></span>
-                <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                <strong>Pengawas</strong>
+                <span class="fold-sum" id="pengawasSummary"></span>
+                <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
               </summary>
-              <div class="collapse-body grid-2">
-                <div>
-                  <label class="form-label" for="fDispatcher">Dispatcher</label>
+              <div class="fold-body grid2">
+                <div class="fld">
+                  <label for="fDispatcher">Dispatcher</label>
                   <input type="text" id="fDispatcher" class="form-control" list="dl-dispatcher" placeholder="Dede - Tulus" />
                 </div>
-                <div>
-                  <label class="form-label" for="fPengawasManuver">Pengawas Manuver</label>
+                <div class="fld">
+                  <label for="fPengawasManuver">Pengawas manuver</label>
                   <input type="text" id="fPengawasManuver" class="form-control" list="dl-pengawas_manuver" placeholder="Dwi - Jafar" />
                 </div>
-                <div>
-                  <label class="form-label" for="fPengawasPekerjaan">Pengawas Pekerjaan</label>
+                <div class="fld">
+                  <label for="fPengawasPekerjaan">Pengawas pekerjaan</label>
                   <input type="text" id="fPengawasPekerjaan" class="form-control" list="dl-pengawas_pekerjaan" placeholder="Dayat" />
                 </div>
-                <div>
-                  <label class="form-label" for="fPengawasK3">Pengawas K3</label>
+                <div class="fld">
+                  <label for="fPengawasK3">Pengawas K3</label>
                   <input type="text" id="fPengawasK3" class="form-control" list="dl-pengawas_k3" placeholder="Sirrul" />
                 </div>
-                <div class="span-2">
-                  <label class="form-label" for="fPelaksanaManuver">Pelaksana Manuver</label>
+                <div class="fld span2">
+                  <label for="fPelaksanaManuver">Pelaksana manuver</label>
                   <input type="text" id="fPelaksanaManuver" class="form-control" list="dl-pelaksana_manuver" placeholder="Rio - Dimas" />
                 </div>
                 <datalist id="dl-dispatcher"></datalist>
@@ -248,45 +247,47 @@
               </div>
             </details>
 
-            <details class="panel panel-collapse" id="pesanPanel">
+            <details class="fold" id="pesanPanel">
               <summary>
-                <span class="panel-title">Pesan penutup</span>
-                <span class="summary-text" id="pesanSummary"></span>
-                <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                <strong>Pesan penutup</strong>
+                <span class="fold-sum" id="pesanSummary"></span>
+                <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
               </summary>
-              <div class="collapse-body">
-                <label class="form-label" for="fPesan" id="pesanLabel">Pesan pembebasan</label>
-                <div class="chip-wrap" id="pesanPresets"></div>
-                <textarea id="fPesan" rows="2" class="form-control mt-2"></textarea>
+              <div class="fold-body">
+                <div class="fld">
+                  <label for="fPesan" id="pesanLabel">Pesan pembebasan</label>
+                  <div class="preset-list" id="pesanPresets"></div>
+                  <textarea id="fPesan" rows="2" class="form-control mt-2"></textarea>
+                </div>
               </div>
             </details>
           </div>
 
-          <aside class="editor-side">
+          <aside class="ed-side">
             <div class="offcanvas-lg offcanvas-bottom preview-panel" tabindex="-1" id="previewPanel" aria-labelledby="previewPanelLabel">
               <div class="offcanvas-header">
-                <h2 class="h6 mb-0" id="previewPanelLabel">Preview jurnal</h2>
+                <h2 class="sheet-title" id="previewPanelLabel">Preview jurnal</h2>
                 <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#previewPanel" aria-label="Tutup"></button>
               </div>
               <div class="offcanvas-body">
                 <div class="preview-inner">
                   <div class="preview-head">
-                    <span class="preview-label">Preview <span class="status-lamp">Live</span></span>
+                    <span class="preview-label">Teks untuk WhatsApp</span>
                     <div class="form-check form-switch mb-0">
                       <input class="form-check-input" type="checkbox" id="waReadMoreToggle" />
-                      <label class="form-check-label" for="waReadMoreToggle">"Baca Selengkapnya"</label>
+                      <label class="form-check-label" for="waReadMoreToggle">Baca selengkapnya</label>
                     </div>
                   </div>
                   <div id="previewBox" class="preview-box"></div>
-                  <button type="button" id="copyBtnSheet" class="btn btn-accent btn-cta w-100 mt-3 d-lg-none">Salin &amp; Simpan</button>
+                  <button type="button" id="copyBtnSheet" class="btn btn-primary w-100 mt-3 d-lg-none">Salin &amp; simpan</button>
                 </div>
               </div>
             </div>
 
-            <div class="action-bar">
-              <button type="button" class="btn btn-outline-secondary d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#previewPanel" aria-controls="previewPanel">Preview</button>
-              <button type="button" id="saveBtn" class="btn btn-outline-accent">Simpan</button>
-              <button type="button" id="copyBtn" class="btn btn-accent btn-cta">Salin &amp; Simpan</button>
+            <div class="actbar">
+              <button type="button" class="btn d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#previewPanel" aria-controls="previewPanel">Preview</button>
+              <button type="button" id="saveBtn" class="btn">Simpan</button>
+              <button type="button" id="copyBtn" class="btn btn-primary">Salin &amp; simpan</button>
             </div>
           </aside>
         </div>
@@ -294,206 +295,215 @@
 
       <section id="view-riwayat" class="view" hidden>
         <div class="page-head">
-          <div>
-            <h1 class="page-title">Riwayat</h1>
-            <div class="page-sub" id="rwCount"></div>
-          </div>
+          <h1>Riwayat <span class="count muted" id="rwCount"></span></h1>
           <div class="dropdown">
             <button type="button" class="icon-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu riwayat">
               <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li><button type="button" class="dropdown-item text-danger" id="rwClearBtn">Hapus semua yang tampil…</button></li>
+              <li><button type="button" class="dropdown-item is-danger" id="rwClearBtn">Hapus semua yang tampil</button></li>
             </ul>
           </div>
         </div>
 
         <div class="toolbar">
-          <div class="search-field">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-            <input type="search" id="rwSearch" class="form-control" placeholder="Cari uraian pekerjaan…" />
+          <div class="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+            <input type="search" id="rwSearch" class="form-control" placeholder="Cari uraian pekerjaan" aria-label="Cari uraian pekerjaan" />
           </div>
-          <div class="seg-group" role="group" aria-label="Filter status">
+          <div class="seg" role="group" aria-label="Filter status">
             <input type="radio" class="btn-check" name="rwStatus" id="rwAll" value="" checked />
-            <label class="seg-label" for="rwAll">Semua</label>
+            <label for="rwAll">Semua</label>
             <input type="radio" class="btn-check" name="rwStatus" id="rwOpen" value="pembebasan" />
-            <label class="seg-label" for="rwOpen">Belum lengkap</label>
+            <label for="rwOpen">Belum dinormalkan</label>
             <input type="radio" class="btn-check" name="rwStatus" id="rwDone" value="lengkap" />
-            <label class="seg-label" for="rwDone">Lengkap</label>
+            <label for="rwDone">Selesai</label>
           </div>
-          <select id="rwGi" class="form-select"></select>
+          <select id="rwGi" class="form-select" aria-label="Filter gardu induk"></select>
         </div>
 
-        <div id="rwList" class="card-grid"></div>
+        <div id="rwList"></div>
       </section>
 
       <section id="view-template" class="view" hidden>
         <div class="page-head">
-          <div>
-            <h1 class="page-title">Template</h1>
-            <div class="page-sub">Urutan manuver yang sering dipakai</div>
-          </div>
-          <button type="button" class="btn btn-accent" id="tplNewBtn">+ Template</button>
+          <h1>Template</h1>
+          <button type="button" class="btn btn-primary btn-sm" id="tplNewBtn">+ Template</button>
         </div>
 
-        <div class="panel tpl-form" id="tplForm" hidden>
-          <div class="grid-2">
-            <div>
-              <label class="form-label" for="tplNama">Nama template</label>
-              <input type="text" id="tplNama" class="form-control" placeholder="Pemeliharaan Bay Line" />
+        <div class="plate tpl-form" id="tplForm" hidden>
+          <div class="grid2">
+            <div class="fld">
+              <label for="tplNama">Nama template</label>
+              <input type="text" id="tplNama" class="form-control" placeholder="Pemeliharaan bay line" />
             </div>
-            <div>
-              <label class="form-label" for="tplBay">Bay <span class="label-hint">opsional</span></label>
+            <div class="fld">
+              <label for="tplBay">Bay <em>opsional</em></label>
               <input type="text" id="tplBay" class="form-control" placeholder="GULUKGULUK 2" />
             </div>
           </div>
           <div class="mv-section">
-            <div class="mv-section-head"><span class="mv-section-title">Pembebasan</span></div>
-            <ol id="tplPembebasanList" class="mv-list"></ol>
-            <div class="mv-actions">
-              <button type="button" class="btn btn-sm btn-outline-accent" data-tpl-add="pembebasan">+ Tambah</button>
+            <div class="mv-sec-head"><h3>Pembebasan</h3></div>
+            <ol id="tplPembebasanList" class="rail"></ol>
+            <div class="rail-actions">
+              <button type="button" class="rail-add" data-tpl-add="pembebasan">
+                <span class="rail-add-node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></span>
+                Tambah manuver
+              </button>
             </div>
           </div>
           <div class="mv-section">
-            <div class="mv-section-head"><span class="mv-section-title">Penormalan</span></div>
-            <ol id="tplPenormalanList" class="mv-list"></ol>
-            <div class="mv-actions">
-              <button type="button" class="btn btn-sm btn-outline-accent" data-tpl-add="penormalan">+ Tambah</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary" id="tplAutoBtn">Susun dari pembebasan</button>
+            <div class="mv-sec-head"><h3>Penormalan</h3></div>
+            <ol id="tplPenormalanList" class="rail"></ol>
+            <div class="rail-actions">
+              <button type="button" class="rail-add" data-tpl-add="penormalan">
+                <span class="rail-add-node" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></span>
+                Tambah manuver
+              </button>
+              <button type="button" class="btn btn-text btn-sm" id="tplAutoBtn">Susun dari pembebasan</button>
             </div>
           </div>
           <div class="form-actions">
-            <button type="button" class="btn btn-outline-secondary" id="tplCancelBtn">Batal</button>
-            <button type="button" class="btn btn-accent" id="tplSaveBtn">Simpan template</button>
+            <button type="button" class="btn" id="tplCancelBtn">Batal</button>
+            <button type="button" class="btn btn-primary" id="tplSaveBtn">Simpan template</button>
           </div>
         </div>
 
-        <div id="tplList" class="card-grid"></div>
+        <div id="tplList"></div>
       </section>
     </main>
 
     <nav class="bottom-nav" aria-label="Navigasi">
       <a href="#/" data-nav="home">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
-        <span>Beranda</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+        Beranda
       </a>
       <a href="#/riwayat" data-nav="riwayat">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        <span>Riwayat</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Riwayat
       </a>
       <a href="#/template" data-nav="template">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
-        <span>Template</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+        Template
       </a>
     </nav>
   </div>
 
   <div class="offcanvas offcanvas-bottom sheet" tabindex="-1" id="rowSheet" aria-labelledby="rowSheetTitle">
+    <div class="grab" aria-hidden="true"></div>
     <div class="offcanvas-header">
-      <h2 class="h6 mb-0" id="rowSheetTitle">Tambah manuver</h2>
+      <h2 class="sheet-title" id="rowSheetTitle">Tambah manuver</h2>
       <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
     </div>
     <div class="offcanvas-body">
       <form id="rowSheetForm" autocomplete="off" novalidate>
-        <div class="sheet-field" id="rsTimeField">
-          <label class="form-label" for="rsWaktu">Waktu</label>
+        <div class="fld" id="rsTimeField">
+          <label for="rsWaktu">Waktu</label>
           <div class="time-row">
-            <input type="text" id="rsWaktu" class="form-control time-input" inputmode="numeric" placeholder="07:58" maxlength="5" />
+            <input type="text" id="rsWaktu" class="time-in" inputmode="numeric" placeholder="07:58" maxlength="5" />
             <div class="chip-row" id="rsTimeChips">
-              <button type="button" class="chip-btn" data-time="now">Sekarang</button>
-              <button type="button" class="chip-btn" data-time="1">+1</button>
-              <button type="button" class="chip-btn" data-time="2">+2</button>
-              <button type="button" class="chip-btn" data-time="5">+5</button>
+              <button type="button" class="chip" data-time="now">Sekarang</button>
+              <button type="button" class="chip" data-time="1" aria-label="Satu menit setelah manuver sebelumnya">+1</button>
+              <button type="button" class="chip" data-time="2" aria-label="Dua menit setelah manuver sebelumnya">+2</button>
+              <button type="button" class="chip" data-time="5" aria-label="Lima menit setelah manuver sebelumnya">+5</button>
             </div>
           </div>
-          <div class="field-error" id="rsWaktuError" hidden>Format jam: 07:58</div>
+          <div class="field-error" id="rsWaktuError" hidden>Format jam belum benar, contoh 07:58</div>
         </div>
-        <div class="sheet-field">
-          <span class="form-label d-block">Peralatan</span>
-          <div class="chip-grid" id="rsPeralatan"></div>
-          <input type="text" id="rsPeralatanCustom" class="form-control mt-2" placeholder="Tulis nama peralatan" hidden />
+        <div class="fld">
+          <span class="lbl">Peralatan</span>
+          <div class="eq-grid" id="rsPeralatan"></div>
+          <input type="text" id="rsPeralatanCustom" class="form-control mt-2" placeholder="Tulis nama peralatan, contoh PMS KOPEL BUS A" aria-label="Nama peralatan lain" hidden />
           <div class="field-error" id="rsPeralatanError" hidden>Pilih peralatan dulu</div>
         </div>
-        <div class="sheet-field">
-          <span class="form-label d-block">Status</span>
-          <div class="seg" id="rsStatus"></div>
+        <div class="fld">
+          <span class="lbl">Status</span>
+          <div class="st-grid" id="rsStatus"></div>
+          <input type="text" id="rsStatusCustom" class="form-control mt-2" placeholder="Contoh: (TEST)" aria-label="Status lain" hidden />
+          <div class="field-error" id="rsStatusError" hidden>Pilih status dulu</div>
         </div>
-        <div class="sheet-field">
-          <label class="form-label" for="rsBay">Bay <span class="label-hint" id="rsBayHint"></span></label>
+        <div class="fld">
+          <label for="rsBay">Bay <em id="rsBayHint"></em></label>
           <input type="text" id="rsBay" class="form-control" />
         </div>
         <button type="submit" hidden></button>
       </form>
     </div>
-    <div class="sheet-footer">
-      <div class="sheet-footer-left">
-        <button type="button" class="btn btn-sm btn-outline-danger" id="rsDelete">Hapus</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary icon-only" id="rsUp" aria-label="Pindah ke atas">↑</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary icon-only" id="rsDown" aria-label="Pindah ke bawah">↓</button>
-      </div>
-      <div class="sheet-footer-right">
-        <button type="button" class="btn btn-outline-accent" id="rsSaveNext">Tambah &amp; lanjut</button>
-        <button type="button" class="btn btn-accent" id="rsSave">Tambah</button>
+    <div class="sheet-foot">
+      <button type="button" class="btn btn-sm btn-danger-text" id="rsDelete">Hapus</button>
+      <button type="button" class="btn btn-sm icon-sq" id="rsUp" aria-label="Pindah ke atas">↑</button>
+      <button type="button" class="btn btn-sm icon-sq" id="rsDown" aria-label="Pindah ke bawah">↓</button>
+      <div class="sheet-foot-main">
+        <button type="button" class="btn" id="rsSaveNext">Tambah &amp; lanjut</button>
+        <button type="button" class="btn btn-primary" id="rsSave">Tambah</button>
       </div>
     </div>
   </div>
 
   <div class="offcanvas offcanvas-bottom sheet" tabindex="-1" id="newSheet" aria-labelledby="newSheetTitle">
+    <div class="grab" aria-hidden="true"></div>
     <div class="offcanvas-header">
-      <h2 class="h6 mb-0" id="newSheetTitle">Mulai jurnal baru</h2>
+      <h2 class="sheet-title" id="newSheetTitle">Mulai jurnal baru</h2>
       <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
     </div>
     <div class="offcanvas-body">
-      <a class="pick-item pick-primary" href="#/jurnal?baru=1" data-close-sheet>
-        <strong>Jurnal kosong</strong>
-        <span>Isi manuver dari awal</span>
-      </a>
-      <div class="pick-label">Dari template</div>
-      <div id="newSheetTemplates" class="pick-list"></div>
+      <a class="pick pick-main" href="#/jurnal?baru=1" data-close-sheet><strong>Jurnal kosong</strong><span>Isi manuver dari awal</span></a>
+      <a class="pick" href="#/jurnal?impor=1" data-close-sheet><strong>Tempel dari WhatsApp</strong><span>Salin jurnal yang sudah ada, semua bagian terisi otomatis</span></a>
+      <h3 class="pick-label">Dari template</h3>
+      <div id="newSheetTemplates"></div>
     </div>
   </div>
 
-  <div class="modal fade" id="textModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade" id="textModal" tabindex="-1" aria-hidden="true" aria-labelledby="textModalTitle">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
-          <h2 id="textModalTitle" class="h6 mb-0">Detail</h2>
+          <div>
+            <h2 id="textModalTitle" class="sheet-title">Detail</h2>
+            <div class="modal-sub" id="textModalSub"></div>
+          </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
         </div>
         <div class="modal-body">
-          <pre id="textModalBody" class="preview-box mb-0"></pre>
+          <pre id="textModalBody" class="preview-box"></pre>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-sm btn-outline-accent" id="textModalCopy">Salin teks</button>
-          <button type="button" class="btn btn-sm btn-accent" id="textModalOpen">Buka di editor</button>
+          <div class="modal-footer-sec" id="textModalJurnalActions">
+            <button type="button" class="btn btn-sm btn-danger-text" id="textModalDelete">Hapus</button>
+            <button type="button" class="btn btn-sm btn-text" id="textModalDasar">Jadikan dasar</button>
+          </div>
+          <div class="modal-footer-main">
+            <button type="button" class="btn btn-sm" id="textModalCopy">Salin teks</button>
+            <button type="button" class="btn btn-sm btn-primary" id="textModalOpen">Buka di editor</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true" aria-labelledby="importTitle">
     <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
-          <h2 class="h6 mb-0" id="importTitle">Import dari teks</h2>
+          <h2 class="sheet-title" id="importTitle">Tempel teks</h2>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
         </div>
         <div class="modal-body">
-          <label class="form-label" for="importTextArea">Tempel teks manuver</label>
-          <textarea id="importTextArea" class="form-control" rows="6" placeholder="07:58 PMT 150kV BAY GULUKGULUK 2 #&#10;07:59 PMS BUS A 150kV BAY GULUKGULUK 2 #"></textarea>
-          <div class="form-text mt-1">Satu manuver per baris: jam, peralatan, bay, status (<code>#</code>, <code>//</code>, <code>Draw In</code>, <code>Draw Out</code>).</div>
+          <p class="modal-hint" id="importHint"></p>
+          <textarea id="importTextArea" class="form-control mono" rows="6" aria-label="Teks yang ditempel" placeholder="07.58 PMT 150kV Bay Gulukguluk 2 #&#10;07.59 PMS Bus A 150kV Bay Gulukguluk 2 Lepas"></textarea>
           <div id="importPreviewWrap" class="mt-3" hidden>
             <div class="table-responsive">
-              <table class="table table-sm align-middle mb-0">
+              <table class="table table-sm imp-table mb-0">
                 <thead><tr><th>Jam</th><th>Peralatan</th><th>Bay</th><th>Status</th></tr></thead>
                 <tbody id="importPreviewBody"></tbody>
               </table>
             </div>
           </div>
+          <div id="importSummary" class="imp-summary mt-3" hidden></div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="button" class="btn btn-sm btn-accent" id="importApplyBtn" disabled>Tambahkan</button>
+          <button type="button" class="btn btn-sm" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-sm btn-primary" id="importApplyBtn" disabled>Tambahkan</button>
         </div>
       </div>
     </div>
@@ -504,6 +514,7 @@
   <script src="auth-gate.js"></script>
   <script src="manuver-parser.js"></script>
   <script src="core.js"></script>
+  <script src="visual.js"></script>
   <script src="editor.js"></script>
   <script src="views.js"></script>
   <script src="main.js"></script>

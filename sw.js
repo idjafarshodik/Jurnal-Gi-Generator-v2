@@ -1,4 +1,4 @@
-const CACHE = "jurnal-gi-v3.0.0";
+const CACHE = "jurnal-gi-v3.1.0";
 const SHELL = [
   "./",
   "index.html",
@@ -6,6 +6,7 @@ const SHELL = [
   "auth-gate.js",
   "manuver-parser.js",
   "core.js",
+  "visual.js",
   "editor.js",
   "views.js",
   "main.js",
