@@ -34,9 +34,7 @@ window.ManuverParser = (function () {
     if (match) {
       let hh = parseInt(match[1], 10);
       let mm = parseInt(match[2], 10);
-      if (isNaN(hh) || isNaN(mm)) return raw;
-      hh = Math.max(0, Math.min(23, hh));
-      mm = Math.max(0, Math.min(59, mm));
+      if (isNaN(hh) || isNaN(mm) || hh > 23 || mm > 59) return raw;
       return String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
     }
 

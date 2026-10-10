@@ -1,4 +1,4 @@
-const CACHE = "jurnal-gi-v3.2.0";
+const CACHE = "jurnal-gi-v3.2.1";
 const SHELL = [
   "./",
   "index.html",

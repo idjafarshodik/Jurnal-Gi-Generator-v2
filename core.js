@@ -38,6 +38,8 @@
 
   JG.sb = () => window.JurnalAuth.supabaseClient;
   JG.normalizeTime = (v) => normalizeSavedTime(v || "");
+  JG.isBadTime = (v) => !!String(v || "").trim() && !/^\d{2}:\d{2}$/.test(JG.normalizeTime(v));
+  JG.badTimeCount = (rows) => (rows || []).filter((r) => JG.isBadTime(r.waktu)).length;
   JG.bayKey = (s) =>
     String(s || "")
       .toUpperCase()
@@ -606,14 +608,15 @@
           : !bay && !r.bay
           ? `<small class="warn">Bay belum diisi</small>`
           : "";
+        const bad = withTime && JG.isBadTime(r.waktu);
         const lead = withTime
-          ? `<span class="mv-time${t ? "" : " is-empty"}">${t || "--:--"}</span>`
+          ? `<span class="mv-time${bad ? " is-bad" : t ? "" : " is-empty"}"${bad ? ' title="Jam tidak valid, ketuk untuk membetulkan"' : ""}>${JG.esc(t) || "--:--"}</span>`
           : `<span class="mv-time mv-no">${i + 1}</span>`;
         return `
         <li class="mv-item" data-index="${i}" tabindex="0" role="button" aria-label="Ubah manuver ${i + 1}: ${JG.esc(r.peralatan)}">
           ${lead}
           <span class="mv-node">${JG.sym(JG.eqType(r.peralatan), JG.stateOf(r.status))}</span>
-          <span class="mv-eq">${JG.esc(r.peralatan || "Peralatan?")}${sub}</span>
+          <span class="mv-eq">${JG.esc(r.peralatan || "Peralatan?")}${sub}${bad ? `<small class="bad">Jam tidak valid</small>` : ""}</span>
           ${JG.statusPill(r.status)}
         </li>`;
       })
@@ -622,7 +625,7 @@
 
   JG.liveCardHtml = function (h) {
     const pb = JG.sortRows(h.jurnal_manuver_rows, "pembebasan");
-    const first = pb.find((r) => JG.normalizeTime(r.waktu));
+    const first = pb.find((r) => JG.normalizeTime(r.waktu) && !JG.isBadTime(r.waktu));
     const since = first ? JG.normalizeTime(first.waktu) : "";
     const elapsed = since ? JG.elapsedSince(h.tanggal, since) : "";
     const sameDay = h.tanggal === JG.todayIso();

@@ -498,6 +498,18 @@
 
   async function copyAndSave() {
     const r = renderPreview();
+    const badN = JG.badTimeCount([...state.pembebasan, ...(state.stage === "penormalan" ? state.penormalan : [])]);
+    if (badN) {
+      const res = await Swal.fire({
+        icon: "warning",
+        title: `${badN} jam tidak valid`,
+        text: "Baris yang ditandai merah jamnya belum benar. Tetap salin?",
+        showCancelButton: true,
+        confirmButtonText: "Tetap salin",
+        cancelButtonText: "Betulkan dulu",
+      });
+      if (!res.isConfirmed) return;
+    }
     const text = $("waReadMoreToggle").checked ? JG.buildReadMoreText(r.visible, r.hidden) : r.text;
     if (!(await JG.copyText(text))) {
       Swal.fire({ icon: "error", title: "Gagal menyalin", text: "Silakan salin manual dari preview." });
@@ -656,7 +668,7 @@
     return rows
       .map(
         (r) =>
-          `<tr><td>${r.waktu || "--:--"}</td><td>${JG.esc(r.peralatan || "-")}</td><td>${JG.esc(r.bay || "-")}</td><td>${JG.statusPill(r.status)}</td></tr>`
+          `<tr${JG.isBadTime(r.waktu) ? ' class="is-bad"' : ""}><td>${JG.esc(r.waktu) || "--:--"}</td><td>${JG.esc(r.peralatan || "-")}</td><td>${JG.esc(r.bay || "-")}</td><td>${JG.statusPill(r.status)}</td></tr>`
       )
       .join("");
   }
@@ -708,6 +720,7 @@
       ${p.penormalan.length ? `<div class="imp-label">Penormalan</div><div class="table-responsive"><table class="table table-sm imp-table"><tbody>${rowsTableHtml(p.penormalan)}</tbody></table></div>` : ""}
       ${p.skipped.length ? `<div class="imp-skip"><div class="imp-label">Tidak ikut dipakai (${p.skipped.length} baris)</div><ul>${p.skipped.map((l) => `<li>${JG.esc(l)}</li>`).join("")}</ul></div>` : ""}
       ${p.extraJurnal ? `<div class="imp-skip warn">Teks berisi lebih dari satu jurnal. Hanya jurnal pertama yang dipakai.</div>` : ""}
+      ${JG.badTimeCount([...p.pembebasan, ...p.penormalan]) ? `<div class="imp-skip warn">${JG.badTimeCount([...p.pembebasan, ...p.penormalan])} jam tidak valid (ditandai merah). Tetap dipakai apa adanya, betulkan di editor.</div>` : ""}
       ${!usable ? `<div class="imp-skip warn">Belum ada baris manuver yang dikenali. Baris manuver harus diawali jam, contoh 07.58 atau 07:58.</div>` : ""}`;
   }
 
@@ -755,12 +768,15 @@
       bootstrap.Modal.getOrCreateInstance($("importModal")).hide();
       $("pengawasPanel").open = !PEOPLE.some(([k]) => (state[k] || "").trim());
       renderAll();
-      if (!p.namaGi && p.giRaw) JG.toast("warning", "Jurnal dipakai, tapi GI belum dipilih", `"${p.giRaw}" belum ada di daftar GI.`, 2800);
+      const badN = JG.badTimeCount([...p.pembebasan, ...p.penormalan]);
+      if (badN) JG.toast("warning", "Jurnal dipakai, ada jam tidak valid", `${badN} jam ditandai merah. Ketuk barisnya untuk membetulkan.`, 3200);
+      else if (!p.namaGi && p.giRaw) JG.toast("warning", "Jurnal dipakai, tapi GI belum dipilih", `"${p.giRaw}" belum ada di daftar GI.`, 2800);
       else JG.toast("success", "Jurnal dipakai", "Cek lagi sebelum disimpan.", 1800);
       return;
     }
 
     if (!importParsed.length) return;
+    const badN = JG.badTimeCount(importParsed);
     const rows = sectionRows(importMode);
     const parsedBay = JG.normEquipment(JG.inferBay(importParsed));
     if (!state.bay && parsedBay) state.bay = parsedBay;
@@ -768,7 +784,8 @@
     bootstrap.Modal.getOrCreateInstance($("importModal")).hide();
     renderLists();
     onChange();
-    JG.toast("success", `${importParsed.length} baris ditambahkan`);
+    if (badN) JG.toast("warning", `${importParsed.length} baris ditambahkan`, `${badN} jam tidak valid, ditandai merah.`, 2800);
+    else JG.toast("success", `${importParsed.length} baris ditambahkan`);
   }
 
   async function saveAsTemplate() {

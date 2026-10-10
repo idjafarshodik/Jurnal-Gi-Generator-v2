@@ -2435,3 +2435,19 @@ body.auth-locked > .app {
     padding: 0 9px;
   }
 }
+
+.mv-time.is-bad {
+  color: var(--red);
+  text-decoration: underline wavy var(--red);
+  text-underline-offset: 4px;
+}
+
+.mv-eq small.bad {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.imp-table tr.is-bad td:first-child {
+  color: var(--red);
+  font-weight: 700;
+}
