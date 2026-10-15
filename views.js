@@ -103,14 +103,31 @@
       const d = JG.editor.draftInfo();
       const desc = [d.gi ? JG.giLabel(d.gi) : "", (d.keterangan || "").replace(/\*/g, "").trim()].filter(Boolean).join(", ");
       box.innerHTML = `
-        <a class="draft" href="#/jurnal">
-          <span class="draft-dot" aria-hidden="true"></span>
-          <span class="draft-text">
-            <strong>${d.id != null ? `Jurnal #${d.id} punya perubahan belum disimpan` : "Ada draft belum disimpan di HP ini"}</strong>
-            <span>${JG.esc(desc || "Belum ada isian identitas")}</span>
-          </span>
-          <span class="draft-go">Lanjutkan</span>
-        </a>`;
+        <div class="draft">
+          <a class="draft-main" href="#/jurnal">
+            <span class="draft-dot" aria-hidden="true"></span>
+            <span class="draft-text">
+              <strong>${d.id != null ? `Jurnal #${d.id} punya perubahan belum disimpan` : "Draft belum disimpan"}</strong>
+              <span>${JG.esc(desc || "Belum ada isian identitas")}</span>
+            </span>
+            <span class="draft-go">Lanjutkan</span>
+          </a>
+          <button type="button" class="draft-x" id="draftDiscardBtn">Buang</button>
+        </div>`;
+      $("draftDiscardBtn").addEventListener("click", async () => {
+        const res = await Swal.fire({
+          icon: "warning",
+          title: d.id != null ? `Buang perubahan Jurnal #${d.id}?` : "Buang draft ini?",
+          text: d.id != null ? `Jurnal #${d.id} di riwayat tidak terhapus, hanya perubahan di HP ini yang dibuang.` : "Isian draft di HP ini dihapus dan tidak bisa dikembalikan.",
+          showCancelButton: true,
+          confirmButtonText: "Buang",
+          cancelButtonText: "Batal",
+        });
+        if (!res.isConfirmed) return;
+        JG.editor.discardDraft();
+        renderDraft();
+        JG.toast("success", "Draft dibuang");
+      });
     }
 
     async function render() {

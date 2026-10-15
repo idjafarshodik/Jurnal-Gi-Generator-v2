@@ -1,6 +1,6 @@
 (function () {
   const JG = window.JG;
-  const VIEWS = ["home", "editor", "riwayat", "template"];
+  const VIEWS = ["home", "editor", "riwayat", "template", "gangguan", "gform"];
   let currentView = "home";
 
   function parseHash() {
@@ -17,7 +17,7 @@
       if (el) el.hidden = v !== view;
     });
     document.body.dataset.route = view;
-    const navKey = view === "editor" ? "home" : view;
+    const navKey = view === "editor" ? "home" : view === "gform" ? "gangguan" : view;
     document.querySelectorAll("[data-nav]").forEach((a) => {
       if (a.dataset.nav === navKey) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
@@ -28,7 +28,11 @@
   async function route() {
     const { parts, params } = parseHash();
     const name = parts[0] || "home";
-    if (name === "jurnal") {
+    if (currentView === "gform" && JG.gangguan) JG.gangguan.leave();
+    if (name === "gangguan") {
+      show(parts[1] ? "gform" : "gangguan");
+      await JG.gangguan.open(parts[1] || null);
+    } else if (name === "jurnal") {
       show("editor");
       await JG.editor.open(parts[1] || null, params);
     } else if (name === "riwayat") {

@@ -31,14 +31,17 @@
   ];
 
   JG.PRESET_AKHIR = [
-    "Alhamdulillah pekerjaan sudah selesai dengan dan lancar🙏",
     "Alhamdulillah pekerjaan sudah selesai dengan aman dan lancar🙏",
     "Alhamdulillah pekerjaan telah selesai dengan lancar, aman personil dan peralatan, terimakasih 🙏🏻",
   ];
 
   JG.sb = () => window.JurnalAuth.supabaseClient;
   JG.normalizeTime = (v) => normalizeSavedTime(v || "");
-  JG.isBadTime = (v) => !!String(v || "").trim() && !/^\d{2}:\d{2}$/.test(JG.normalizeTime(v));
+  JG.isValidTime = (t) => {
+    const m = /^(\d{2}):(\d{2})$/.exec(String(t || ""));
+    return !!m && +m[1] < 24 && +m[2] < 60;
+  };
+  JG.isBadTime = (v) => !!String(v || "").trim() && !JG.isValidTime(JG.normalizeTime(v));
   JG.badTimeCount = (rows) => (rows || []).filter((r) => JG.isBadTime(r.waktu)).length;
   JG.bayKey = (s) =>
     String(s || "")
@@ -449,7 +452,7 @@
   };
 
   JG.timeRange = function (rows) {
-    const times = rows.map((r) => JG.normalizeTime(r.waktu)).filter((t) => /^\d{2}:\d{2}$/.test(t));
+    const times = rows.map((r) => JG.normalizeTime(r.waktu)).filter((t) => JG.isValidTime(t));
     if (!times.length) return "";
     return times.length === 1 ? times[0] : `${times[0]}–${times[times.length - 1]}`;
   };
@@ -659,7 +662,7 @@
     const gi = h.gi?.nama ? JG.giLabel(h.gi.nama) : "GI ?";
     const bay = JG.bayLine(pb.length ? pb : all);
     const lastRows = lengkap && pn.length ? pn : pb;
-    const times = lastRows.map((r) => JG.normalizeTime(r.waktu)).filter((t) => /^\d{2}:\d{2}$/.test(t));
+    const times = lastRows.map((r) => JG.normalizeTime(r.waktu)).filter((t) => JG.isValidTime(t));
     const end = times.length ? times[times.length - 1] : "--:--";
     const who = h.diubah_oleh || h.dibuat_oleh || "";
     return `
@@ -854,7 +857,7 @@
         $("rsStatusError").hidden = false;
         bad = true;
       }
-      if (row.waktu && !/^\d{2}:\d{2}$/.test(row.waktu)) {
+      if (row.waktu && !JG.isValidTime(row.waktu)) {
         $("rsWaktuError").hidden = false;
         bad = true;
       }

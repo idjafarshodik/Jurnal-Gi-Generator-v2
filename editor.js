@@ -39,6 +39,7 @@
       const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
       if (d && d.state) {
         state = { ...newState(), ...d.state };
+        if (state.pesanPenormalan === "Alhamdulillah pekerjaan sudah selesai dengan dan lancar🙏") state.pesanPenormalan = JG.PRESET_AKHIR[0];
         active = { ...EMPTY_ACTIVE, ...(d.active || {}) };
       }
     } catch (e) {}
@@ -100,8 +101,6 @@
 
   function hasContent() {
     return !!(
-      state.namaGi ||
-      state.tanggal ||
       state.keterangan.trim() ||
       PEOPLE.some(([k]) => (state[k] || "").trim()) ||
       state.pembebasan.length ||
@@ -247,6 +246,32 @@
     $("autoPenormalanCard").hidden = !empty;
     $("autoPenormalanCard").querySelector("button").disabled = !state.pembebasan.length;
     $("penormalanActions").hidden = empty;
+    renderMismatch();
+  }
+
+  function pnMismatch() {
+    const key = (r) => `${JG.bayKey(r.bay || state.bay)}|${JG.canonPeralatan(r.peralatan)}`;
+    const pb = new Set(state.pembebasan.map(key));
+    const seen = new Set();
+    const out = [];
+    state.penormalan.forEach((r) => {
+      const t = JG.eqType(r.peralatan);
+      if (t === "other" || t === "pms") return;
+      const k = key(r);
+      if (pb.has(k) || seen.has(k)) return;
+      seen.add(k);
+      const ownBay = r.bay && !JG.sameBay(r.bay, state.bay) ? ` bay ${r.bay}` : "";
+      out.push(`${JG.canonPeralatan(r.peralatan)}${ownBay}`);
+    });
+    return out;
+  }
+
+  function renderMismatch() {
+    const box = $("pnMismatch");
+    const list = state.penormalan.length && state.pembebasan.length ? pnMismatch() : [];
+    box.hidden = !list.length;
+    if (!list.length) return;
+    $("pnMismatchText").textContent = `${list.join(", ")} ada di penormalan tapi tidak ada di pembebasan. Cek lagi, atau susun ulang dari pembebasan.`;
   }
 
   function renderStage() {
@@ -914,6 +939,7 @@
 
     $("autoPenormalanBtn").addEventListener("click", autoPenormalan);
     $("autoPenormalanAgainBtn").addEventListener("click", autoPenormalan);
+    $("pnMismatchBtn").addEventListener("click", autoPenormalan);
     $("bayChip").addEventListener("click", editBay);
 
     $("importTextArea").addEventListener("input", renderImportPreview);
@@ -1007,6 +1033,15 @@
     hasLocalDraft() {
       init();
       return hasContent() && (active.id == null || isDirty());
+    },
+    discardDraft() {
+      init();
+      state = newState();
+      active = { ...EMPTY_ACTIVE };
+      showPembebasanList = false;
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch (e) {}
     },
     draftInfo() {
       return { gi: state.namaGi, keterangan: state.keterangan, id: active.id, rows: state.pembebasan.length };

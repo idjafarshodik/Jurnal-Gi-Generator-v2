@@ -1,4 +1,4 @@
-const CACHE = "jurnal-gi-v3.2.1";
+const CACHE = "jurnal-gi-v3.3.0";
 const SHELL = [
   "./",
   "index.html",
@@ -9,6 +9,8 @@ const SHELL = [
   "visual.js",
   "editor.js",
   "views.js",
+  "gangguan-parser.js",
+  "gangguan.js",
   "main.js",
   "manifest.webmanifest",
   "icons/icon-192.png",

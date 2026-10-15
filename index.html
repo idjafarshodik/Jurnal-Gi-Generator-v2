@@ -64,6 +64,7 @@
         <nav class="top-nav" aria-label="Navigasi utama">
           <a href="#/" data-nav="home">Beranda</a>
           <a href="#/riwayat" data-nav="riwayat">Riwayat</a>
+          <a href="#/gangguan" data-nav="gangguan">Gangguan</a>
           <a href="#/template" data-nav="template">Template</a>
         </nav>
         <div class="dropdown">
@@ -208,6 +209,10 @@
                   <input type="date" id="fTanggalPenormalan" class="form-control" />
                 </div>
                 <p class="tn-note" id="tnNote" hidden></p>
+                <div class="pn-warn" id="pnMismatch" role="status" hidden>
+                  <span id="pnMismatchText"></span>
+                  <button type="button" class="btn btn-sm" id="pnMismatchBtn">Susun ulang</button>
+                </div>
                 <div id="autoPenormalanCard" class="auto-card">
                   <p><strong>Susun otomatis dari pembebasan.</strong> Urutan dibalik, status <b>#</b> dan <b>//</b> ditukar, jam diisi sendiri.</p>
                   <div class="auto-actions">
@@ -361,6 +366,228 @@
         <div id="rwList"></div>
       </section>
 
+      <section id="view-gangguan" class="view" hidden>
+        <div class="page-head">
+          <div>
+            <h1>Laporan gangguan</h1>
+            <p class="page-sub" id="gCount"></p>
+          </div>
+          <div class="page-actions">
+            <a href="#/gangguan/impor" class="btn btn-sm">Tempel dari WA</a>
+            <a href="#/gangguan/baru" class="btn btn-primary btn-sm">+ Laporan</a>
+          </div>
+        </div>
+        <div id="gList"></div>
+      </section>
+
+      <section id="view-gform" class="view" hidden>
+        <div class="ed-top">
+          <a href="#/gangguan" class="icon-btn" aria-label="Kembali ke daftar laporan gangguan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </a>
+          <div class="ed-title">
+            <h1 id="gTitle">Laporan gangguan baru</h1>
+            <div id="gSaveStatus" class="save-status" data-state="empty" role="status" aria-live="polite"><span id="gSaveStatusText">Belum disimpan</span></div>
+          </div>
+          <div class="dropdown">
+            <button type="button" class="icon-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu laporan">
+              <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" id="gMenu">
+              <li><button type="button" class="dropdown-item" data-action="impor">Tempel teks dari WhatsApp</button></li>
+              <li><button type="button" class="dropdown-item" data-action="sisi">Buat laporan sisi GI lain</button></li>
+              <li><hr class="dropdown-divider" /></li>
+              <li><button type="button" class="dropdown-item is-danger" data-action="hapus">Hapus laporan</button></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="ed-grid">
+          <div class="ed-main">
+            <div id="gMissing" class="g-miss" role="status" aria-live="polite"></div>
+
+            <div class="plate">
+              <h2 class="plate-h">Objek gangguan</h2>
+              <div class="fld">
+                <span class="lbl">Jenis</span>
+                <div class="opt-seg" id="gJenis" role="group" aria-label="Jenis objek">
+                  <button type="button" data-v="SUTT">SUTT</button>
+                  <button type="button" data-v="Trafo">Trafo</button>
+                  <button type="button" data-v="Kopel">Kopel</button>
+                  <button type="button" data-v="Shunt Capacitor">Shunt Cap.</button>
+                </div>
+              </div>
+              <div class="grid2 mt-2">
+                <div class="fld">
+                  <label for="gGi">Gardu induk</label>
+                  <select id="gGi" class="form-select"></select>
+                </div>
+                <div class="fld">
+                  <label for="gBay" id="gBayLabel">Bay di GI ini</label>
+                  <input type="text" id="gBay" class="form-control" list="gBayList" placeholder="Sampang 2" autocomplete="off" />
+                  <datalist id="gBayList"></datalist>
+                </div>
+              </div>
+              <div class="fld mt-2">
+                <label for="gObjek">Nama objek</label>
+                <input type="text" id="gObjek" class="form-control" list="dl-gobjek" placeholder="SUTT 150kV Sampang-Pamekasan #2" autocomplete="off" />
+                <datalist id="dl-gobjek"></datalist>
+                <button type="button" class="btn btn-text btn-sm g-usul" id="gObjekUsul" hidden></button>
+              </div>
+              <div class="grid2 mt-2">
+                <div class="fld">
+                  <label for="gTanggal">Tanggal</label>
+                  <input type="date" id="gTanggal" class="form-control" />
+                </div>
+                <div class="fld">
+                  <label for="gJam">Jam kejadian</label>
+                  <div class="g-time">
+                    <input type="text" id="gJam" class="form-control" inputmode="numeric" placeholder="11:42" maxlength="5" autocomplete="off" />
+                    <button type="button" class="btn btn-sm" data-now="gJam">Sekarang</button>
+                  </div>
+                </div>
+              </div>
+              <div class="fld mt-2">
+                <span class="lbl">Kejadian</span>
+                <div class="opt-seg" id="gKejadian" role="group" aria-label="Kejadian">
+                  <button type="button" data-v="Trip">Trip</button>
+                  <button type="button" data-v="Reclose sukses">Reclose sukses</button>
+                  <button type="button" data-v="Reclose gagal">Reclose gagal</button>
+                  <button type="button" data-v="__lain">Lainnya</button>
+                </div>
+                <input type="text" id="gKejadianLain" class="form-control mt-2" placeholder="Tulis kejadian" hidden />
+              </div>
+              <div class="fld mt-2">
+                <label for="gKronologi">Kronologi tambahan <em>opsional</em></label>
+                <textarea id="gKronologi" class="form-control g-list" rows="1" placeholder="Pukul 11.45 WIB PMT dicoba masuk, gagal"></textarea>
+              </div>
+            </div>
+
+            <div class="plate">
+              <h2 class="plate-h">Indikasi dan relai</h2>
+              <p class="g-lokasi" id="gLokasi"></p>
+              <div class="fld">
+                <label for="gStatus">Status peralatan</label>
+                <input type="text" id="gStatus" class="form-control" autocomplete="off" />
+                <div class="sg-row" id="gStatusChips"></div>
+              </div>
+              <div class="fld mt-3">
+                <label for="gPanel">Indikasi panel / announciator <em>1 baris = 1 indikasi</em></label>
+                <textarea id="gPanel" class="form-control g-list" rows="3" placeholder="A/R LOCKOUT&#10;86"></textarea>
+                <div class="sg-hint" id="gPanelHint" hidden>Pernah dipakai di GI ini:</div>
+                <div class="sg-row" id="gPanelChips"></div>
+              </div>
+              <div class="fld mt-3">
+                <label for="gRelay">Indikasi relay <em>1 baris = 1 indikasi</em></label>
+                <textarea id="gRelay" class="form-control g-list" rows="3" placeholder="LCD Trip R&#10;Distance Trip Z1 Phasa A-N"></textarea>
+                <div class="sg-hint" id="gRelayHint" hidden>Pernah dipakai di GI ini:</div>
+                <div class="sg-row" id="gRelayChips"></div>
+              </div>
+              <div class="fld mt-3 g-fl">
+                <label for="gFl">Fault locator (FL)</label>
+                <div class="g-unit"><input type="text" id="gFl" class="form-control" inputmode="decimal" placeholder="18,84" autocomplete="off" /><span>km</span></div>
+              </div>
+
+              <div class="g-counters mt-3">
+                <div class="cn">
+                  <div class="cn-h">Counter PMT</div>
+                  <div class="cn-cols" aria-hidden="true"><span></span><span>Sebelum</span><span></span><span>Sesudah</span><span></span></div>
+                  <div class="cn-row"><span class="cn-ph">R</span><input type="text" id="cPmtR0" class="form-control" inputmode="numeric" aria-label="Counter PMT phasa R sebelum" /><span class="cn-arr" aria-hidden="true">→</span><input type="text" id="cPmtR1" class="form-control" inputmode="numeric" aria-label="Counter PMT phasa R sesudah" /><span class="cn-delta" id="cPmtRd"></span></div>
+                  <div class="cn-row"><span class="cn-ph">S</span><input type="text" id="cPmtS0" class="form-control" inputmode="numeric" aria-label="Counter PMT phasa S sebelum" /><span class="cn-arr" aria-hidden="true">→</span><input type="text" id="cPmtS1" class="form-control" inputmode="numeric" aria-label="Counter PMT phasa S sesudah" /><span class="cn-delta" id="cPmtSd"></span></div>
+                  <div class="cn-row"><span class="cn-ph">T</span><input type="text" id="cPmtT0" class="form-control" inputmode="numeric" aria-label="Counter PMT phasa T sebelum" /><span class="cn-arr" aria-hidden="true">→</span><input type="text" id="cPmtT1" class="form-control" inputmode="numeric" aria-label="Counter PMT phasa T sesudah" /><span class="cn-delta" id="cPmtTd"></span></div>
+                </div>
+                <div class="cn">
+                  <div class="cn-h">Counter LA</div>
+                  <div class="cn-cols" aria-hidden="true"><span></span><span>Sebelum</span><span></span><span>Sesudah</span><span></span></div>
+                  <div class="cn-row"><span class="cn-ph">R</span><input type="text" id="cLaR0" class="form-control" inputmode="numeric" aria-label="Counter LA phasa R sebelum" /><span class="cn-arr" aria-hidden="true">→</span><input type="text" id="cLaR1" class="form-control" inputmode="numeric" aria-label="Counter LA phasa R sesudah" /><span class="cn-delta" id="cLaRd"></span></div>
+                  <div class="cn-row"><span class="cn-ph">S</span><input type="text" id="cLaS0" class="form-control" inputmode="numeric" aria-label="Counter LA phasa S sebelum" /><span class="cn-arr" aria-hidden="true">→</span><input type="text" id="cLaS1" class="form-control" inputmode="numeric" aria-label="Counter LA phasa S sesudah" /><span class="cn-delta" id="cLaSd"></span></div>
+                  <div class="cn-row"><span class="cn-ph">T</span><input type="text" id="cLaT0" class="form-control" inputmode="numeric" aria-label="Counter LA phasa T sebelum" /><span class="cn-arr" aria-hidden="true">→</span><input type="text" id="cLaT1" class="form-control" inputmode="numeric" aria-label="Counter LA phasa T sesudah" /><span class="cn-delta" id="cLaTd"></span></div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-text btn-sm mt-1" id="gCounterFill" hidden></button>
+
+              <div class="fld mt-3">
+                <span class="lbl">Kondisi cuaca</span>
+                <div class="opt-seg wrap" id="gCuaca" role="group" aria-label="Kondisi cuaca">
+                  <button type="button" data-v="Cerah">Cerah</button>
+                  <button type="button" data-v="Berawan">Berawan</button>
+                  <button type="button" data-v="Mendung">Mendung</button>
+                  <button type="button" data-v="Hujan">Hujan</button>
+                  <button type="button" data-v="Hujan petir">Hujan petir</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="plate">
+              <h2 class="plate-h">Penyebab, dampak, tindak lanjut</h2>
+              <div class="fld">
+                <label for="gPenyebab">Penyebab gangguan</label>
+                <textarea id="gPenyebab" class="form-control g-list" rows="2"></textarea>
+                <div class="sg-row" id="gPenyebabChips"></div>
+              </div>
+              <div class="fld mt-3">
+                <label for="gDampak">Dampak gangguan</label>
+                <textarea id="gDampak" class="form-control g-list" rows="1"></textarea>
+                <div class="sg-row" id="gDampakChips"></div>
+              </div>
+              <div class="fld mt-3">
+                <label for="gTindak">Tindak lanjut</label>
+                <textarea id="gTindak" class="form-control g-list" rows="3"></textarea>
+                <div class="sg-row" id="gTindakChips"></div>
+              </div>
+            </div>
+
+            <details class="fold" id="gPenormalanFold">
+              <summary><strong>Penormalan</strong><span class="fold-sum">opsional</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+              <div class="fold-body">
+                <div class="fld">
+                  <label for="gPmtMasuk">PMT masuk jam</label>
+                  <div class="g-time">
+                    <input type="text" id="gPmtMasuk" class="form-control" inputmode="numeric" placeholder="13:53" maxlength="5" autocomplete="off" />
+                    <button type="button" class="btn btn-sm" data-now="gPmtMasuk">Sekarang</button>
+                  </div>
+                </div>
+                <div class="fld mt-2">
+                  <label for="gPenormalan">Keterangan lain</label>
+                  <textarea id="gPenormalan" class="form-control g-list" rows="1" placeholder="Reclose sukses di kedua sisi"></textarea>
+                </div>
+              </div>
+            </details>
+
+            <details class="fold" id="gCatatanFold">
+              <summary><strong>Catatan lain</strong><span class="fold-sum">opsional</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+              <div class="fold-body">
+                <div class="fld">
+                  <label for="gCatatan">Ditulis sebelum penutup laporan <em>termasuk baris teks yang tidak dikenali</em></label>
+                  <textarea id="gCatatan" class="form-control g-list" rows="2"></textarea>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <aside class="ed-side">
+            <div class="offcanvas-lg offcanvas-bottom preview-panel" tabindex="-1" id="gPreviewPanel" aria-labelledby="gPreviewLabel">
+              <div class="offcanvas-header">
+                <h2 class="sheet-title" id="gPreviewLabel">Preview laporan</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#gPreviewPanel" aria-label="Tutup"></button>
+              </div>
+              <div class="offcanvas-body">
+                <div class="preview-inner">
+                  <div class="preview-head"><span class="preview-label">Teks untuk WhatsApp</span></div>
+                  <div id="gPreview" class="preview-box"></div>
+                  <button type="button" id="gCopyBtnSheet" class="btn btn-primary w-100 mt-3 d-lg-none">Salin &amp; simpan</button>
+                </div>
+              </div>
+            </div>
+            <div class="actbar">
+              <button type="button" class="btn d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#gPreviewPanel" aria-controls="gPreviewPanel">Preview</button>
+              <button type="button" id="gSaveBtn" class="btn">Simpan</button>
+              <button type="button" id="gCopyBtn" class="btn btn-primary">Salin &amp; simpan</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
       <section id="view-template" class="view" hidden>
         <div class="page-head">
           <div>
@@ -420,6 +647,10 @@
       <a href="#/riwayat" data-nav="riwayat">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
         Riwayat
+      </a>
+      <a href="#/gangguan" data-nav="gangguan">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>
+        Gangguan
       </a>
       <a href="#/template" data-nav="template">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
@@ -548,6 +779,26 @@
     </div>
   </div>
 
+  <div class="modal fade" id="gImportModal" tabindex="-1" aria-hidden="true" aria-labelledby="gImportTitle">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="sheet-title" id="gImportTitle">Tempel laporan gangguan</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-hint">Tempel teks dasar dari SPV atau laporan yang sudah ada. Bagian yang kosong boleh dibiarkan, nanti dilengkapi di form.</p>
+          <textarea id="gImportText" class="form-control mono" rows="10" aria-label="Teks laporan gangguan" placeholder="Laporan Gangguan UIT JBM&#10;UPT Gresik - ULTG Sampang&#10;SUTT 150kV ..."></textarea>
+          <div id="gImportSummary" class="imp-summary mt-3"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-sm btn-primary" id="gImportApply" disabled>Pakai laporan ini</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth-gate.js"></script>
@@ -556,6 +807,8 @@
   <script src="visual.js"></script>
   <script src="editor.js"></script>
   <script src="views.js"></script>
+  <script src="gangguan-parser.js"></script>
+  <script src="gangguan.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
