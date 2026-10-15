@@ -65,7 +65,7 @@
       input: "select",
       inputOptions: options,
       inputValue: JG.getMine(),
-      inputLabel: "Beranda menampilkan GI ini lebih dulu, dan jurnal baru otomatis memakai GI ini. Pengaturan ini hanya berlaku di HP ini.",
+      inputLabel: "Tampil pertama di beranda dan dipakai untuk jurnal baru. Hanya berlaku di HP ini.",
       showCancelButton: true,
       confirmButtonText: "Simpan",
       cancelButtonText: "Batal",

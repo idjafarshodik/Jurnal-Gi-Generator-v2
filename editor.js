@@ -154,13 +154,6 @@
     $("tnDateWrap").hidden = !diff;
     if (document.activeElement !== $("fTanggalPenormalan")) $("fTanggalPenormalan").value = diff ? state.tanggalPenormalan : "";
     $("tnHari").textContent = diff ? JG.hariFromDate(state.tanggalPenormalan) : "";
-    const note = $("tnNote");
-    if (diff && state.tanggal) {
-      note.hidden = false;
-      note.textContent = `${state.tnAuto ? "Diisi otomatis. " : ""}Pembebasan ${JG.formatTanggalPendek(state.tanggal)}, penormalan ${JG.formatTanggalPendek(state.tanggalPenormalan)}. Tanggal ditulis per bagian di teks WA.`;
-    } else {
-      note.hidden = true;
-    }
     $("tglLabel").textContent = diff ? "Tanggal pembebasan" : "Tanggal";
     $("hariLabel").hidden = diff;
   }
@@ -239,7 +232,7 @@
   function renderLists() {
     JG.renderRowList($("pembebasanList"), state.pembebasan, {
       bay: state.bay,
-      emptyText: "Belum ada manuver. Tekan + Tambah atau Import teks.",
+      emptyText: "Belum ada manuver. Tekan Tambah manuver, atau Dari teks untuk menempel dari WhatsApp.",
     });
     JG.renderRowList($("penormalanList"), state.penormalan, { bay: state.bay });
     const empty = !state.penormalan.length;
@@ -271,7 +264,7 @@
     const list = state.penormalan.length && state.pembebasan.length ? pnMismatch() : [];
     box.hidden = !list.length;
     if (!list.length) return;
-    $("pnMismatchText").textContent = `${list.join(", ")} ada di penormalan tapi tidak ada di pembebasan. Cek lagi, atau susun ulang dari pembebasan.`;
+    $("pnMismatchText").textContent = `${list.join(", ")} tidak ada di daftar pembebasan. Cek lagi sebelum disalin.`;
   }
 
   function renderStage() {
@@ -628,13 +621,13 @@
       state.penormalan = JG.reverseRows(state.pembebasan);
       renderLists();
       onChange();
-      JG.toast("success", "Penormalan disusun otomatis", "Tinggal isi jamnya.", 1800);
+      JG.toast("success", "Penormalan tersusun", "Cek urutannya, lalu isi jam.", 1800);
     };
     if (!state.penormalan.length) return run();
     Swal.fire({
       icon: "question",
       title: "Susun ulang penormalan?",
-      text: "Daftar penormalan sekarang akan diganti dengan kebalikan pembebasan.",
+      text: "Daftar penormalan yang sekarang akan diganti dengan susunan baru dari pembebasan.",
       showCancelButton: true,
       confirmButtonText: "Ganti",
       cancelButtonText: "Batal",
@@ -647,7 +640,7 @@
       input: "text",
       inputValue: state.bay,
       inputPlaceholder: "Contoh: GULUKGULUK 2",
-      inputLabel: "Dipakai semua baris yang bay-nya tidak diisi sendiri.",
+      inputLabel: "Berlaku untuk semua baris manuver, kecuali yang diisi bay lain.",
       showCancelButton: true,
       confirmButtonText: "Simpan",
       cancelButtonText: "Batal",
@@ -681,8 +674,8 @@
       ? "Tempel jurnal lengkap"
       : `Tambah baris ${mode === "pembebasan" ? "pembebasan" : "penormalan"} dari teks`;
     $("importHint").textContent = full
-      ? "Tempel satu jurnal utuh dari WhatsApp. Gardu induk, tanggal, uraian, manuver, pengawas, dan pesan penutup akan dikenali otomatis."
-      : "Satu manuver per baris: jam, peralatan, bay, lalu status (#, //, Lepas, Masuk, Draw In, Draw Out).";
+      ? "Tempel satu jurnal dari WhatsApp, lalu cek hasilnya di bawah sebelum dipakai."
+      : "Satu manuver per baris, contoh: 07.58 PMT 150kV Bay Sampang 2 #";
     $("importApplyBtn").textContent = full ? "Pakai jurnal ini" : "Tambahkan";
     $("importTextArea").rows = full ? 10 : 6;
     bootstrap.Modal.getOrCreateInstance($("importModal")).show();

@@ -2419,16 +2419,6 @@ body.auth-locked > .app {
   font-weight: 500;
 }
 
-.tn-note {
-  margin: 6px 0 8px;
-  padding: 8px 10px;
-  border-radius: var(--r-sm);
-  background: var(--amber-tint);
-  color: var(--ink);
-  font-size: 0.86rem;
-  line-height: 1.35;
-}
-
 .sub20 {
   margin-top: 4px;
   padding-top: 10px;

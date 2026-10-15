@@ -417,7 +417,7 @@
       title: "Laporan sisi GI lain",
       input: "select",
       inputOptions: opts,
-      inputLabel: "Objek, tanggal, kejadian, penyebab, dampak, tindak lanjut, dan penormalan ikut disalin. Bay, jam, indikasi, dan counter dikosongkan.",
+      inputLabel: "Data kejadian ikut terbawa. Bay, jam, indikasi, dan counter diisi sesuai GI tersebut.",
       showCancelButton: true,
       confirmButtonText: "Buat",
       cancelButtonText: "Batal",

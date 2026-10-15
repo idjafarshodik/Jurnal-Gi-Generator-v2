@@ -208,15 +208,14 @@
                   <label for="fTanggalPenormalan">Tanggal penormalan <em id="tnHari"></em></label>
                   <input type="date" id="fTanggalPenormalan" class="form-control" />
                 </div>
-                <p class="tn-note" id="tnNote" hidden></p>
                 <div class="pn-warn" id="pnMismatch" role="status" hidden>
                   <span id="pnMismatchText"></span>
                   <button type="button" class="btn btn-sm" id="pnMismatchBtn">Susun ulang</button>
                 </div>
                 <div id="autoPenormalanCard" class="auto-card">
-                  <p><strong>Susun otomatis dari pembebasan.</strong> Urutan dibalik, status <b>#</b> dan <b>//</b> ditukar, jam diisi sendiri.</p>
+                  <p><strong>Penormalan bisa disusun dari daftar pembebasan.</strong> Cek urutannya, lalu isi jam.</p>
                   <div class="auto-actions">
-                    <button type="button" class="btn btn-primary btn-sm" id="autoPenormalanBtn">Susun otomatis</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="autoPenormalanBtn">Susun dari pembebasan</button>
                     <button type="button" class="btn btn-sm" data-add-row="penormalan">Isi manual</button>
                   </div>
                 </div>
@@ -558,7 +557,7 @@
               <summary><strong>Catatan lain</strong><span class="fold-sum">opsional</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
               <div class="fold-body">
                 <div class="fld">
-                  <label for="gCatatan">Ditulis sebelum penutup laporan <em>termasuk baris teks yang tidak dikenali</em></label>
+                  <label for="gCatatan">Catatan tambahan <em>ditulis sebelum penutup</em></label>
                   <textarea id="gCatatan" class="form-control g-list" rows="2"></textarea>
                 </div>
               </div>
@@ -718,7 +717,7 @@
     </div>
     <div class="offcanvas-body">
       <a class="pick pick-main" href="#/jurnal?baru=1" data-close-sheet><strong>Jurnal kosong</strong><span>Isi manuver dari awal</span></a>
-      <a class="pick" href="#/jurnal?impor=1" data-close-sheet><strong>Tempel dari WhatsApp</strong><span>Salin jurnal yang sudah ada, semua bagian terisi otomatis</span></a>
+      <a class="pick" href="#/jurnal?impor=1" data-close-sheet><strong>Tempel dari WhatsApp</strong><span>Pakai teks jurnal yang sudah dikirim di grup</span></a>
       <h3 class="pick-label">Dari template</h3>
       <div id="newSheetTemplates"></div>
     </div>
